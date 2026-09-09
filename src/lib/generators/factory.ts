@@ -1,23 +1,18 @@
 /**
- * 生成器工厂（增强版）
- * 
- * 支持：
- * - 根据 provider 创建生成器
+ * 生成器工厂（官方 API 严格模式）
+ *
+ * 这里只允许能够明确证明为模型厂商第一方 API 的实现。
+ * 协议兼容层、聚合平台和第三方托管平台不得在这里注册。
  */
 
 import { ImageGenerator, VideoGenerator, AudioGenerator } from './base'
-import { FalBananaGenerator } from './fal'
 import { ArkSeedreamGenerator, ArkSeedanceVideoGenerator } from './ark'
-import { FalVideoGenerator } from './fal'
 import {
     GoogleGeminiImageGenerator,
     GoogleImagenGenerator,
     GoogleGeminiBatchImageGenerator,
-    GeminiCompatibleImageGenerator,
-    OpenAICompatibleImageGenerator,
 } from './image'
 import { GoogleVeoVideoGenerator } from './video/google'
-import { OpenAICompatibleVideoGenerator } from './video'
 import { MinimaxVideoGenerator } from './minimax'
 import { ViduVideoGenerator } from './vidu'
 import { getProviderKey } from '@/lib/api-config'
@@ -25,15 +20,26 @@ import {
     BailianAudioGenerator,
     BailianImageGenerator,
     BailianVideoGenerator,
-    SiliconFlowAudioGenerator,
-    SiliconFlowImageGenerator,
-    SiliconFlowVideoGenerator,
 } from './official'
-import { EvolinkImageGenerator, EvolinkVideoGenerator, EvolinkAudioGenerator } from './evolink'
 
-/**
- * 根据 provider 创建图片生成器
- */
+const BLOCKED_PROVIDER_KEYS = new Set([
+    'evolink',
+    'fal',
+    'siliconflow',
+    'openrouter',
+    'openai-compatible',
+    'gemini-compatible',
+])
+
+function assertNotRelayProvider(provider: string): string {
+    const providerKey = getProviderKey(provider).toLowerCase()
+    if (BLOCKED_PROVIDER_KEYS.has(providerKey)) {
+        throw new Error(`OFFICIAL_PROVIDER_REQUIRED: ${provider} is disabled in official-only mode`)
+    }
+    return providerKey
+}
+
+/** 根据 provider 创建图片生成器。 */
 export function createImageGenerator(provider: string, modelId?: string): ImageGenerator {
     const normalizeModelId = (rawModelId?: string): string | undefined => {
         if (!rawModelId) return rawModelId
@@ -42,10 +48,8 @@ export function createImageGenerator(provider: string, modelId?: string): ImageG
     }
 
     const actualModelId = normalizeModelId(modelId)
-    const providerKey = getProviderKey(provider).toLowerCase()
+    const providerKey = assertNotRelayProvider(provider)
     switch (providerKey) {
-        case 'fal':
-            return new FalBananaGenerator()
         case 'google':
             if (actualModelId === 'gemini-3-pro-image-preview-batch') {
                 return new GoogleGeminiBatchImageGenerator()
@@ -54,71 +58,45 @@ export function createImageGenerator(provider: string, modelId?: string): ImageG
                 return new GoogleImagenGenerator(actualModelId)
             }
             return new GoogleGeminiImageGenerator(actualModelId)
-        case 'google-batch':  // 🔥 Gemini Batch 异步模式
+        case 'google-batch':
             return new GoogleGeminiBatchImageGenerator()
         case 'imagen':
             return new GoogleImagenGenerator(actualModelId)
         case 'ark':
             return new ArkSeedreamGenerator()
-        case 'gemini-compatible':
-            return new GeminiCompatibleImageGenerator(actualModelId, provider)
-        case 'openai-compatible':
-            return new OpenAICompatibleImageGenerator(actualModelId, provider)
         case 'bailian':
             return new BailianImageGenerator()
-        case 'siliconflow':
-            return new SiliconFlowImageGenerator()
-        case 'evolink':
-            return new EvolinkImageGenerator()
         default:
-            throw new Error(`Unknown image generator provider: ${provider}`)
+            throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: image provider ${provider} has no first-party generator implementation`)
     }
 }
 
-/**
- * 根据 provider 创建视频生成器
- */
+/** 根据 provider 创建视频生成器。 */
 export function createVideoGenerator(provider: string): VideoGenerator {
-    const providerKey = getProviderKey(provider).toLowerCase()
+    const providerKey = assertNotRelayProvider(provider)
     switch (providerKey) {
-        case 'fal':
-            return new FalVideoGenerator()
         case 'ark':
             return new ArkSeedanceVideoGenerator()
         case 'google':
             return new GoogleVeoVideoGenerator()
-        case 'gemini-compatible':
-            return new GoogleVeoVideoGenerator(provider)
         case 'minimax':
             return new MinimaxVideoGenerator()
         case 'vidu':
             return new ViduVideoGenerator()
-        case 'openai-compatible':
-            return new OpenAICompatibleVideoGenerator(provider)
         case 'bailian':
             return new BailianVideoGenerator()
-        case 'siliconflow':
-            return new SiliconFlowVideoGenerator()
-        case 'evolink':
-            return new EvolinkVideoGenerator()
         default:
-            throw new Error(`Unknown video generator provider: ${provider}`)
+            throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: video provider ${provider} has no first-party generator implementation`)
     }
 }
 
-/**
- * 创建语音生成器
- */
+/** 创建语音生成器。 */
 export function createAudioGenerator(provider: string): AudioGenerator {
-    const providerKey = getProviderKey(provider).toLowerCase()
+    const providerKey = assertNotRelayProvider(provider)
     switch (providerKey) {
         case 'bailian':
             return new BailianAudioGenerator()
-        case 'siliconflow':
-            return new SiliconFlowAudioGenerator()
-        case 'evolink':
-            return new EvolinkAudioGenerator()
         default:
-            throw new Error(`Unknown audio generator provider: ${provider}`)
+            throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: audio provider ${provider} has no first-party generator implementation`)
     }
 }
