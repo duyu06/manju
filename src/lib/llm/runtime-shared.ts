@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { createScopedLogger } from '@/lib/logging/core'
 import { resolveModelSelection } from '../api-config'
 import { recordTextUsage as recordBillingTextUsage } from '@/lib/billing/runtime-usage'
+import { assertOfficialProvider } from '@/lib/providers/official/provider-policy'
 
 export const llmLogger = createScopedLogger({
   module: 'llm.client',
@@ -103,7 +104,6 @@ export function logLlmRawOutput(params: {
       output: {
         reasoning: params.reasoning,
         text: params.text,
-        // 空响应时显式标记，方便 grep
         empty: isEmpty || undefined,
       },
       usage: params.usage || null,
@@ -149,6 +149,7 @@ export async function resolveLlmRuntimeModel(
   model: string,
 ): Promise<ResolvedLlmRuntimeModel> {
   const selection = await resolveModelSelection(userId, model, 'llm')
+  assertOfficialProvider(selection.provider)
   return {
     provider: selection.provider,
     modelId: selection.modelId,
