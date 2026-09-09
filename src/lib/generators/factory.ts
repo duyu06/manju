@@ -1,124 +1,86 @@
 /**
- * 生成器工厂（增强版）
- * 
- * 支持：
- * - 根据 provider 创建生成器
+ * Media generator factory.
+ *
+ * Security invariant: only first-party model-vendor adapters are reachable here.
+ * Aggregators/relays and arbitrary compatible gateways must never be registered.
  */
 
 import { ImageGenerator, VideoGenerator, AudioGenerator } from './base'
-import { FalBananaGenerator } from './fal'
 import { ArkSeedreamGenerator, ArkSeedanceVideoGenerator } from './ark'
-import { FalVideoGenerator } from './fal'
 import {
-    GoogleGeminiImageGenerator,
-    GoogleImagenGenerator,
-    GoogleGeminiBatchImageGenerator,
-    GeminiCompatibleImageGenerator,
-    OpenAICompatibleImageGenerator,
+  GoogleGeminiImageGenerator,
+  GoogleImagenGenerator,
+  GoogleGeminiBatchImageGenerator,
 } from './image'
 import { GoogleVeoVideoGenerator } from './video/google'
-import { OpenAICompatibleVideoGenerator } from './video'
 import { MinimaxVideoGenerator } from './minimax'
 import { ViduVideoGenerator } from './vidu'
 import { getProviderKey } from '@/lib/api-config'
 import {
-    BailianAudioGenerator,
-    BailianImageGenerator,
-    BailianVideoGenerator,
-    SiliconFlowAudioGenerator,
-    SiliconFlowImageGenerator,
-    SiliconFlowVideoGenerator,
+  BailianAudioGenerator,
+  BailianImageGenerator,
+  BailianVideoGenerator,
 } from './official'
-import { EvolinkImageGenerator, EvolinkVideoGenerator, EvolinkAudioGenerator } from './evolink'
 
-/**
- * 根据 provider 创建图片生成器
- */
+function directProviderKey(provider: string): string {
+  return getProviderKey(provider).toLowerCase()
+}
+
+/** Create an image generator backed by the model vendor's official API. */
 export function createImageGenerator(provider: string, modelId?: string): ImageGenerator {
-    const normalizeModelId = (rawModelId?: string): string | undefined => {
-        if (!rawModelId) return rawModelId
-        const delimiterIndex = rawModelId.indexOf('::')
-        return delimiterIndex === -1 ? rawModelId : rawModelId.slice(delimiterIndex + 2)
-    }
+  const normalizeModelId = (rawModelId?: string): string | undefined => {
+    if (!rawModelId) return rawModelId
+    const delimiterIndex = rawModelId.indexOf('::')
+    return delimiterIndex === -1 ? rawModelId : rawModelId.slice(delimiterIndex + 2)
+  }
 
-    const actualModelId = normalizeModelId(modelId)
-    const providerKey = getProviderKey(provider).toLowerCase()
-    switch (providerKey) {
-        case 'fal':
-            return new FalBananaGenerator()
-        case 'google':
-            if (actualModelId === 'gemini-3-pro-image-preview-batch') {
-                return new GoogleGeminiBatchImageGenerator()
-            }
-            if (actualModelId && actualModelId.startsWith('imagen-')) {
-                return new GoogleImagenGenerator(actualModelId)
-            }
-            return new GoogleGeminiImageGenerator(actualModelId)
-        case 'google-batch':  // 🔥 Gemini Batch 异步模式
-            return new GoogleGeminiBatchImageGenerator()
-        case 'imagen':
-            return new GoogleImagenGenerator(actualModelId)
-        case 'ark':
-            return new ArkSeedreamGenerator()
-        case 'gemini-compatible':
-            return new GeminiCompatibleImageGenerator(actualModelId, provider)
-        case 'openai-compatible':
-            return new OpenAICompatibleImageGenerator(actualModelId, provider)
-        case 'bailian':
-            return new BailianImageGenerator()
-        case 'siliconflow':
-            return new SiliconFlowImageGenerator()
-        case 'evolink':
-            return new EvolinkImageGenerator()
-        default:
-            throw new Error(`Unknown image generator provider: ${provider}`)
-    }
+  const actualModelId = normalizeModelId(modelId)
+  switch (directProviderKey(provider)) {
+    case 'google':
+      if (actualModelId === 'gemini-3-pro-image-preview-batch') {
+        return new GoogleGeminiBatchImageGenerator()
+      }
+      if (actualModelId && actualModelId.startsWith('imagen-')) {
+        return new GoogleImagenGenerator(actualModelId)
+      }
+      return new GoogleGeminiImageGenerator(actualModelId)
+    case 'google-batch':
+      return new GoogleGeminiBatchImageGenerator()
+    case 'imagen':
+      return new GoogleImagenGenerator(actualModelId)
+    case 'ark':
+      return new ArkSeedreamGenerator()
+    case 'bailian':
+      return new BailianImageGenerator()
+    default:
+      throw new Error(`DIRECT_OFFICIAL_PROVIDER_REQUIRED: unsupported image provider ${provider}`)
+  }
 }
 
-/**
- * 根据 provider 创建视频生成器
- */
+/** Create a video generator backed by the model vendor's official API. */
 export function createVideoGenerator(provider: string): VideoGenerator {
-    const providerKey = getProviderKey(provider).toLowerCase()
-    switch (providerKey) {
-        case 'fal':
-            return new FalVideoGenerator()
-        case 'ark':
-            return new ArkSeedanceVideoGenerator()
-        case 'google':
-            return new GoogleVeoVideoGenerator()
-        case 'gemini-compatible':
-            return new GoogleVeoVideoGenerator(provider)
-        case 'minimax':
-            return new MinimaxVideoGenerator()
-        case 'vidu':
-            return new ViduVideoGenerator()
-        case 'openai-compatible':
-            return new OpenAICompatibleVideoGenerator(provider)
-        case 'bailian':
-            return new BailianVideoGenerator()
-        case 'siliconflow':
-            return new SiliconFlowVideoGenerator()
-        case 'evolink':
-            return new EvolinkVideoGenerator()
-        default:
-            throw new Error(`Unknown video generator provider: ${provider}`)
-    }
+  switch (directProviderKey(provider)) {
+    case 'ark':
+      return new ArkSeedanceVideoGenerator()
+    case 'google':
+      return new GoogleVeoVideoGenerator()
+    case 'minimax':
+      return new MinimaxVideoGenerator()
+    case 'vidu':
+      return new ViduVideoGenerator()
+    case 'bailian':
+      return new BailianVideoGenerator()
+    default:
+      throw new Error(`DIRECT_OFFICIAL_PROVIDER_REQUIRED: unsupported video provider ${provider}`)
+  }
 }
 
-/**
- * 创建语音生成器
- */
+/** Create an audio generator backed by the model vendor's official API. */
 export function createAudioGenerator(provider: string): AudioGenerator {
-    const providerKey = getProviderKey(provider).toLowerCase()
-    switch (providerKey) {
-        case 'bailian':
-            return new BailianAudioGenerator()
-        case 'siliconflow':
-            return new SiliconFlowAudioGenerator()
-        case 'evolink':
-            return new EvolinkAudioGenerator()
-        default:
-            throw new Error(`Unknown audio generator provider: ${provider}`)
-    }
+  switch (directProviderKey(provider)) {
+    case 'bailian':
+      return new BailianAudioGenerator()
+    default:
+      throw new Error(`DIRECT_OFFICIAL_PROVIDER_REQUIRED: unsupported audio provider ${provider}`)
+  }
 }
