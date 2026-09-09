@@ -2,12 +2,14 @@ import { StorageConfigError } from '@/lib/storage/errors'
 import { LocalStorageProvider } from '@/lib/storage/providers/local'
 import { MinioStorageProvider } from '@/lib/storage/providers/minio'
 import { CosStorageProvider } from '@/lib/storage/providers/cos'
-import { EvolinkStorageProvider } from '@/lib/storage/providers/evolink'
 import type { StorageFactoryOptions, StorageProvider, StorageType } from '@/lib/storage/types'
 
 function normalizeStorageType(rawType: string | undefined): StorageType {
   const normalized = (rawType || 'minio').trim().toLowerCase()
-  if (normalized === 'minio' || normalized === 'local' || normalized === 'cos' || normalized === 'evolink') {
+  if (normalized === 'evolink') {
+    throw new StorageConfigError('STORAGE_TYPE=evolink is disabled in official-api-only mode; use minio, local, or cos')
+  }
+  if (normalized === 'minio' || normalized === 'local' || normalized === 'cos') {
     return normalized
   }
   throw new StorageConfigError(`Unsupported STORAGE_TYPE: ${rawType}`)
@@ -16,9 +18,6 @@ function normalizeStorageType(rawType: string | undefined): StorageType {
 export function createStorageProvider(options: StorageFactoryOptions = {}): StorageProvider {
   const type = normalizeStorageType(options.storageType || process.env.STORAGE_TYPE)
 
-  if (type === 'evolink') {
-    return new EvolinkStorageProvider()
-  }
   if (type === 'minio') {
     return new MinioStorageProvider()
   }
