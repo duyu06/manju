@@ -1,10 +1,10 @@
 /**
- * API 配置读取器（配置中心严格模式）
+ * API configuration reader — direct-official mode.
  *
- * 规则：
- * 1) 模型唯一键必须是 provider::modelId
- * 2) 禁止 provider 猜测、静态映射、默认降级
- * 3) 运行时只从配置中心读取 provider 与密钥
+ * Outbound invariant:
+ *   Browser/UI -> this application server -> model vendor official API
+ *
+ * User-controlled relay/proxy endpoints are intentionally unsupported.
  */
 
 import { prisma } from './prisma'
@@ -19,7 +19,6 @@ import type {
   OpenAICompatMediaTemplateSource,
 } from './openai-compat-media-template'
 import { validateOpenAICompatMediaTemplate } from './user-api/model-template/validator'
-import { EVOLINK_MODEL_PRESETS } from './providers/evolink/presets'
 
 export interface CustomModel {
   modelId: string
@@ -32,7 +31,6 @@ export interface CustomModel {
   compatMediaTemplate?: OpenAICompatMediaTemplate
   compatMediaTemplateCheckedAt?: string
   compatMediaTemplateSource?: OpenAICompatMediaTemplateSource
-  // Non-authoritative display field; billing uses unified server pricing catalog.
   price: number
 }
 
@@ -48,6 +46,7 @@ export interface ModelSelection {
 }
 
 type GatewayRouteType = 'official' | 'openai-compat'
+type LlmProtocolType = 'responses' | 'chat-completions'
 
 interface CustomProvider {
   id: string
@@ -55,37 +54,48 @@ interface CustomProvider {
   baseUrl?: string
   apiKey?: string
   apiMode?: 'gemini-sdk' | 'openai-official'
-  gatewayRoute?: GatewayRouteType
+  gatewayRoute: GatewayRouteType
 }
 
-type LlmProtocolType = 'responses' | 'chat-completions'
+/** Provider families implemented against first-party vendor APIs in this repository. */
+const DIRECT_PROVIDER_KEYS = new Set([
+  'openai',
+  'google',
+  'google-batch',
+  'imagen',
+  'ark',
+  'bailian',
+  'minimax',
+  'vidu',
+  // Some vendors expose their own OpenAI-compatible endpoint. The URL is
+  // accepted only after it passes OFFICIAL_MODEL_API_HOSTS below.
+  'openai-compatible',
+])
 
-function normalizeProviderBaseUrl(providerId: string, rawBaseUrl?: string): string | undefined {
-  const providerKey = getProviderKey(providerId)
-  if (providerKey === 'minimax') {
-    return 'https://api.minimaxi.com/v1'
-  }
+/** Explicitly retired relay/aggregator provider families. */
+const RETIRED_PROVIDER_KEYS = new Set([
+  'evolink',
+  'fal',
+  'siliconflow',
+  'openrouter',
+  'litellm',
+  'gemini-compatible',
+])
 
-  const baseUrl = readTrimmedString(rawBaseUrl)
-  if (!baseUrl) return undefined
-  if (providerKey !== 'openai-compatible') return baseUrl
-
-  try {
-    const parsed = new URL(baseUrl)
-    // 智谱开放平台使用 /api/paas/v4 作为版本段（无 v1），不能追加 /v1
-    if (parsed.hostname.endsWith('bigmodel.cn')) return baseUrl
-    const pathSegments = parsed.pathname.split('/').filter(Boolean)
-    const hasV1 = pathSegments.includes('v1')
-    if (hasV1) return baseUrl
-
-    const trimmedPath = parsed.pathname.replace(/\/+$/, '')
-    parsed.pathname = `${trimmedPath === '' || trimmedPath === '/' ? '' : trimmedPath}/v1`
-    return parsed.toString()
-  } catch {
-    // Keep original value to avoid hiding invalid-config errors.
-    return baseUrl
-  }
-}
+/**
+ * First-party API hosts allowed for configurable OpenAI-compatible vendors.
+ * Built-in providers do not consume a user supplied base URL at all.
+ */
+const OFFICIAL_MODEL_API_HOSTS = new Set([
+  'api.openai.com',
+  'open.bigmodel.cn',
+  'api.z.ai',
+  'dashscope.aliyuncs.com',
+  'ark.cn-beijing.volces.com',
+  'api.minimaxi.com',
+  'api.vidu.com',
+  'api.klingai.com',
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -96,28 +106,81 @@ function readTrimmedString(value: unknown): string {
 }
 
 function isUnifiedModelType(value: unknown): value is UnifiedModelType {
-  return (
-    value === 'llm'
-    || value === 'image'
-    || value === 'video'
-    || value === 'audio'
-    || value === 'lipsync'
-  )
-}
-
-function isGatewayRoute(value: unknown): value is GatewayRouteType {
-  return value === 'official' || value === 'openai-compat'
+  return value === 'llm' || value === 'image' || value === 'video' || value === 'audio' || value === 'lipsync'
 }
 
 function isLlmProtocol(value: unknown): value is LlmProtocolType {
   return value === 'responses' || value === 'chat-completions'
 }
 
+/** Extract provider family from an instance id such as openai-compatible:uuid. */
+export function getProviderKey(providerId?: string): string {
+  if (!providerId) return ''
+  const colonIndex = providerId.indexOf(':')
+  return colonIndex === -1 ? providerId : providerId.slice(0, colonIndex)
+}
+
+function isRetiredProvider(providerId: string): boolean {
+  return RETIRED_PROVIDER_KEYS.has(getProviderKey(providerId).toLowerCase())
+}
+
+function assertDirectProvider(providerId: string): string {
+  const key = getProviderKey(providerId).toLowerCase()
+  if (RETIRED_PROVIDER_KEYS.has(key)) {
+    throw new Error(`MODEL_RELAY_PROVIDER_REMOVED: ${providerId}`)
+  }
+  if (!DIRECT_PROVIDER_KEYS.has(key)) {
+    throw new Error(`DIRECT_OFFICIAL_PROVIDER_REQUIRED: ${providerId}`)
+  }
+  return key
+}
+
+/**
+ * Validate a configurable endpoint before it can ever become an outbound target.
+ * This deliberately rejects HTTP, localhost/IPs, userinfo, custom ports and
+ * non-vendor domains, so a LiteLLM/proxy URL cannot be smuggled into the config.
+ */
+export function assertOfficialModelApiBaseUrl(rawBaseUrl: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(rawBaseUrl)
+  } catch {
+    throw new Error('OFFICIAL_PROVIDER_URL_INVALID: invalid URL')
+  }
+
+  const hostname = parsed.hostname.toLowerCase()
+  if (parsed.protocol !== 'https:') {
+    throw new Error('OFFICIAL_PROVIDER_URL_INVALID: HTTPS is required')
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('OFFICIAL_PROVIDER_URL_INVALID: URL credentials are forbidden')
+  }
+  if (parsed.port && parsed.port !== '443') {
+    throw new Error('OFFICIAL_PROVIDER_URL_INVALID: custom ports are forbidden')
+  }
+  if (!OFFICIAL_MODEL_API_HOSTS.has(hostname)) {
+    throw new Error(`OFFICIAL_PROVIDER_URL_REQUIRED: ${hostname}`)
+  }
+
+  parsed.hash = ''
+  parsed.search = ''
+  return parsed.toString().replace(/\/$/, '')
+}
+
+function fixedOfficialBaseUrl(providerKey: string): string | undefined {
+  switch (providerKey) {
+    case 'openai':
+      return 'https://api.openai.com/v1'
+    case 'minimax':
+      return 'https://api.minimaxi.com/v1'
+    default:
+      return undefined
+  }
+}
+
 function assertModelKey(value: string, field: string): { provider: string; modelId: string; modelKey: string } {
   const parsed = parseModelKeyStrict(value)
-  if (!parsed) {
-    throw new Error(`MODEL_KEY_INVALID: ${field} must be provider::modelId`)
-  }
+  if (!parsed) throw new Error(`MODEL_KEY_INVALID: ${field} must be provider::modelId`)
   return parsed
 }
 
@@ -130,7 +193,6 @@ function parseCustomProviders(rawProviders: string | null | undefined): CustomPr
   } catch {
     throw new Error('PROVIDER_PAYLOAD_INVALID: customProviders is not valid JSON')
   }
-
   if (!Array.isArray(parsedUnknown)) {
     throw new Error('PROVIDER_PAYLOAD_INVALID: customProviders must be an array')
   }
@@ -138,83 +200,60 @@ function parseCustomProviders(rawProviders: string | null | undefined): CustomPr
   const providers: CustomProvider[] = []
   for (let index = 0; index < parsedUnknown.length; index += 1) {
     const raw = parsedUnknown[index]
-    if (!isRecord(raw)) {
-      throw new Error(`PROVIDER_PAYLOAD_INVALID: providers[${index}] must be an object`)
-    }
+    if (!isRecord(raw)) throw new Error(`PROVIDER_PAYLOAD_INVALID: providers[${index}] must be an object`)
 
     const id = readTrimmedString(raw.id)
     const name = readTrimmedString(raw.name)
-    if (!id || !name) {
-      throw new Error(`PROVIDER_PAYLOAD_INVALID: providers[${index}] missing id or name`)
-    }
-    const normalizedId = id.toLowerCase()
-    if (providers.some((provider) => provider.id.toLowerCase() === normalizedId)) {
+    if (!id || !name) throw new Error(`PROVIDER_PAYLOAD_INVALID: providers[${index}] missing id or name`)
+
+    // Ignore legacy relay records so existing databases can boot, but never make
+    // those records available to model selection or outbound code.
+    if (isRetiredProvider(id)) continue
+
+    const providerKey = assertDirectProvider(id)
+    if (providers.some((provider) => provider.id.toLowerCase() === id.toLowerCase())) {
       throw new Error(`PROVIDER_DUPLICATE: providers[${index}].id duplicates id ${id}`)
     }
 
-    const providerKey = getProviderKey(id).toLowerCase()
+    const rawBaseUrl = readTrimmedString(raw.baseUrl)
+    let baseUrl = fixedOfficialBaseUrl(providerKey)
+    if (providerKey === 'openai-compatible') {
+      if (!rawBaseUrl) {
+        throw new Error(`OFFICIAL_PROVIDER_URL_REQUIRED: providers[${index}].baseUrl`)
+      }
+      baseUrl = assertOfficialModelApiBaseUrl(rawBaseUrl)
+    }
+    // User supplied base URLs for built-in providers are deliberately ignored.
+
     const apiModeRaw = raw.apiMode
     let apiMode: 'gemini-sdk' | 'openai-official' | undefined
-    if (apiModeRaw === undefined) {
-      apiMode = undefined
-    } else if (apiModeRaw === 'gemini-sdk' || apiModeRaw === 'openai-official') {
-      if (providerKey === 'gemini-compatible' && apiModeRaw === 'openai-official') {
-        throw new Error(`PROVIDER_API_MODE_INVALID: providers[${index}].apiMode`)
-      }
-      apiMode = apiModeRaw
-    } else {
-      throw new Error(`PROVIDER_API_MODE_INVALID: providers[${index}].apiMode`)
-    }
-
-    const gatewayRouteRaw = raw.gatewayRoute
-    let gatewayRoute: GatewayRouteType | undefined
-    if (gatewayRouteRaw === undefined) {
-      gatewayRoute = undefined
-    } else if (!isGatewayRoute(gatewayRouteRaw)) {
-      throw new Error(`PROVIDER_GATEWAY_ROUTE_INVALID: providers[${index}].gatewayRoute`)
-    } else if (providerKey === 'openai-compatible' && gatewayRouteRaw === 'official') {
-      throw new Error(`PROVIDER_GATEWAY_ROUTE_INVALID: providers[${index}].gatewayRoute`)
-    } else if (providerKey !== 'openai-compatible' && gatewayRouteRaw === 'openai-compat') {
-      throw new Error(`PROVIDER_GATEWAY_ROUTE_INVALID: providers[${index}].gatewayRoute`)
-    } else {
-      gatewayRoute = gatewayRouteRaw
-    }
+    if (apiModeRaw === 'gemini-sdk' || apiModeRaw === 'openai-official') apiMode = apiModeRaw
 
     providers.push({
       id,
       name,
-      baseUrl: readTrimmedString(raw.baseUrl) || undefined,
+      baseUrl,
       apiKey: readTrimmedString(raw.apiKey) || undefined,
       apiMode,
-      gatewayRoute,
+      gatewayRoute: providerKey === 'openai-compatible' ? 'openai-compat' : 'official',
     })
   }
-
   return providers
 }
 
 function normalizeStoredModel(raw: unknown, index: number): CustomModel {
-  if (!isRecord(raw)) {
-    throw new Error(`MODEL_PAYLOAD_INVALID: models[${index}] must be an object`)
-  }
-
-  if (!isUnifiedModelType(raw.type)) {
-    throw new Error(`MODEL_TYPE_INVALID: models[${index}].type is invalid`)
-  }
+  if (!isRecord(raw)) throw new Error(`MODEL_PAYLOAD_INVALID: models[${index}] must be an object`)
+  if (!isUnifiedModelType(raw.type)) throw new Error(`MODEL_TYPE_INVALID: models[${index}].type is invalid`)
 
   const providerFromField = readTrimmedString(raw.provider)
   const modelIdFromField = readTrimmedString(raw.modelId)
   const modelKeyFromField = readTrimmedString(raw.modelKey)
-
   const parsedFromKey = modelKeyFromField ? parseModelKeyStrict(modelKeyFromField) : null
   const provider = providerFromField || parsedFromKey?.provider || ''
   const modelId = modelIdFromField || parsedFromKey?.modelId || ''
   const modelKey = composeModelKey(provider, modelId)
 
-  if (!modelKey) {
-    throw new Error(`MODEL_KEY_INVALID: models[${index}] must include provider and modelId`)
-  }
-
+  if (!modelKey) throw new Error(`MODEL_KEY_INVALID: models[${index}] must include provider and modelId`)
   if (parsedFromKey && parsedFromKey.modelKey !== modelKey) {
     throw new Error(`MODEL_KEY_MISMATCH: models[${index}].modelKey conflicts with provider/modelId`)
   }
@@ -222,26 +261,23 @@ function normalizeStoredModel(raw: unknown, index: number): CustomModel {
   const llmProtocolRaw = raw.llmProtocol
   let llmProtocol: LlmProtocolType | undefined
   if (llmProtocolRaw !== undefined && llmProtocolRaw !== null) {
-    if (!isLlmProtocol(llmProtocolRaw)) {
-      throw new Error(`MODEL_LLM_PROTOCOL_INVALID: models[${index}].llmProtocol`)
-    }
+    if (!isLlmProtocol(llmProtocolRaw)) throw new Error(`MODEL_LLM_PROTOCOL_INVALID: models[${index}].llmProtocol`)
     llmProtocol = llmProtocolRaw
   }
   const llmProtocolCheckedAt = readTrimmedString(raw.llmProtocolCheckedAt) || undefined
 
-  const compatMediaTemplateRaw = raw.compatMediaTemplate
   let compatMediaTemplate: OpenAICompatMediaTemplate | undefined
-  if (compatMediaTemplateRaw !== undefined && compatMediaTemplateRaw !== null) {
-    const validated = validateOpenAICompatMediaTemplate(compatMediaTemplateRaw)
+  if (raw.compatMediaTemplate !== undefined && raw.compatMediaTemplate !== null) {
+    const validated = validateOpenAICompatMediaTemplate(raw.compatMediaTemplate)
     if (!validated.ok || !validated.template) {
       throw new Error(`MODEL_COMPAT_MEDIA_TEMPLATE_INVALID: models[${index}].compatMediaTemplate`)
     }
     compatMediaTemplate = validated.template
   }
   const compatMediaTemplateCheckedAt = readTrimmedString(raw.compatMediaTemplateCheckedAt) || undefined
-  const compatMediaTemplateSourceRaw = readTrimmedString(raw.compatMediaTemplateSource)
-  const compatMediaTemplateSource = compatMediaTemplateSourceRaw === 'ai' || compatMediaTemplateSourceRaw === 'manual'
-    ? compatMediaTemplateSourceRaw
+  const source = readTrimmedString(raw.compatMediaTemplateSource)
+  const compatMediaTemplateSource: OpenAICompatMediaTemplateSource | undefined = source === 'ai' || source === 'manual'
+    ? source
     : undefined
 
   return {
@@ -261,49 +297,25 @@ function normalizeStoredModel(raw: unknown, index: number): CustomModel {
 
 function parseCustomModels(rawModels: string | null | undefined): CustomModel[] {
   if (!rawModels) return []
-
   let parsedUnknown: unknown
   try {
     parsedUnknown = JSON.parse(rawModels)
   } catch {
     throw new Error('MODEL_PAYLOAD_INVALID: customModels is not valid JSON')
   }
-
-  if (!Array.isArray(parsedUnknown)) {
-    throw new Error('MODEL_PAYLOAD_INVALID: customModels must be an array')
-  }
-
-  const models: CustomModel[] = []
-  for (let index = 0; index < parsedUnknown.length; index += 1) {
-    models.push(normalizeStoredModel(parsedUnknown[index], index))
-  }
-
-  return models
-}
-
-function pickProviderStrict(
-  providers: CustomProvider[],
-  providerId: string,
-): CustomProvider {
-  const matched = providers.find((provider) => provider.id === providerId)
-  if (matched) return matched
-
-  throw new Error(`PROVIDER_NOT_FOUND: ${providerId} is not configured`)
+  if (!Array.isArray(parsedUnknown)) throw new Error('MODEL_PAYLOAD_INVALID: customModels must be an array')
+  return parsedUnknown.map((model, index) => normalizeStoredModel(model, index))
 }
 
 async function readUserConfig(userId: string): Promise<{ models: CustomModel[]; providers: CustomProvider[] }> {
   const pref = await prisma.userPreference.findUnique({
     where: { userId },
-    select: {
-      customModels: true,
-      customProviders: true,
-    },
+    select: { customModels: true, customProviders: true },
   })
-
-  return {
-    models: parseCustomModels(pref?.customModels),
-    providers: parseCustomProviders(pref?.customProviders),
-  }
+  const providers = parseCustomProviders(pref?.customProviders)
+  const providerIds = new Set(providers.map((provider) => provider.id))
+  const models = parseCustomModels(pref?.customModels).filter((model) => providerIds.has(model.provider))
+  return { models, providers }
 }
 
 function findModelByKey(models: CustomModel[], modelKey: string): CustomModel | null {
@@ -311,18 +323,6 @@ function findModelByKey(models: CustomModel[], modelKey: string): CustomModel | 
   return models.find((model) => model.modelId === parsed.modelId && model.provider === parsed.provider) || null
 }
 
-/**
- * 提取提供商主键（用于多实例场景，如 gemini-compatible:uuid）
- */
-export function getProviderKey(providerId?: string): string {
-  if (!providerId) return ''
-  const colonIndex = providerId.indexOf(':')
-  return colonIndex === -1 ? providerId : providerId.slice(0, colonIndex)
-}
-
-/**
- * 统一模型选择解析（严格模式）
- */
 export async function resolveModelSelection(
   userId: string,
   model: string,
@@ -330,13 +330,10 @@ export async function resolveModelSelection(
 ): Promise<ModelSelection> {
   const parsed = assertModelKey(model, `${mediaType} model`)
   const models = await getModelsByType(userId, mediaType)
-
   const exact = findModelByKey(models, parsed.modelKey)
-  if (!exact) {
-    throw new Error(`MODEL_NOT_FOUND: ${parsed.modelKey} is not enabled for ${mediaType}`)
-  }
+  if (!exact) throw new Error(`MODEL_NOT_FOUND: ${parsed.modelKey} is not enabled for ${mediaType}`)
 
-  const providerKey = getProviderKey(exact.provider).toLowerCase()
+  const providerKey = assertDirectProvider(exact.provider)
   const llmProtocol = mediaType === 'llm' && providerKey === 'openai-compatible'
     ? (exact.llmProtocol || 'chat-completions')
     : undefined
@@ -354,61 +351,26 @@ export async function resolveModelSelection(
   }
 }
 
-async function resolveSingleModelSelection(
-  userId: string,
-  mediaType: ModelMediaType,
-): Promise<ModelSelection> {
+async function resolveSingleModelSelection(userId: string, mediaType: ModelMediaType): Promise<ModelSelection> {
   const models = await getModelsByType(userId, mediaType)
-  if (models.length === 0) {
-    throw new Error(`MODEL_NOT_CONFIGURED: no ${mediaType} model is enabled`)
-  }
+  if (models.length === 0) throw new Error(`MODEL_NOT_CONFIGURED: no ${mediaType} model is enabled`)
   if (models.length > 1) {
     throw new Error(`MODEL_SELECTION_REQUIRED: multiple ${mediaType} models are enabled, provide model_key explicitly`)
   }
-
-  const model = models[0]
-  const providerKey = getProviderKey(model.provider).toLowerCase()
-  const llmProtocol = mediaType === 'llm' && providerKey === 'openai-compatible'
-    ? (model.llmProtocol || 'chat-completions')
-    : undefined
-  const compatMediaTemplate = (mediaType === 'image' || mediaType === 'video') && providerKey === 'openai-compatible'
-    ? model.compatMediaTemplate
-    : undefined
-
-  return {
-    provider: model.provider,
-    modelId: model.modelId,
-    modelKey: composeModelKey(model.provider, model.modelId),
-    mediaType,
-    ...(llmProtocol ? { llmProtocol } : {}),
-    ...(compatMediaTemplate ? { compatMediaTemplate } : {}),
-  }
+  return await resolveModelSelection(userId, models[0].modelKey, mediaType)
 }
 
-/**
- * 统一模型选择解析（允许显式 model_key；未传时仅允许单模型）
- */
 export async function resolveModelSelectionOrSingle(
   userId: string,
   model: string | null | undefined,
   mediaType: ModelMediaType,
 ): Promise<ModelSelection> {
   const modelKey = readTrimmedString(model)
-  if (!modelKey) {
-    return await resolveSingleModelSelection(userId, mediaType)
-  }
-  return await resolveModelSelection(userId, modelKey, mediaType)
+  return modelKey
+    ? await resolveModelSelection(userId, modelKey, mediaType)
+    : await resolveSingleModelSelection(userId, mediaType)
 }
 
-/**
- * Provider 配置
- *
- * 返回 provider 的完整连接信息（apiKey 已解密）。
- * baseUrl 和 apiMode 为可选——不同 provider 需求不同，由调用方自行校验。
- *
- * ⚠️ 调用方必须先通过 resolveModelSelection 校验模型归属，
- * 再使用 selection.provider 调用本函数，禁止直接传入未校验的 providerId。
- */
 export interface ProviderConfig {
   id: string
   name: string
@@ -419,115 +381,58 @@ export interface ProviderConfig {
 }
 
 export async function getProviderConfig(userId: string, providerId: string): Promise<ProviderConfig> {
+  assertDirectProvider(providerId)
   const { providers } = await readUserConfig(userId)
-  const provider = pickProviderStrict(providers, providerId)
-
-  if (!provider.apiKey) {
-    throw new Error(`PROVIDER_API_KEY_MISSING: ${provider.id}`)
-  }
+  const provider = providers.find((candidate) => candidate.id === providerId)
+  if (!provider) throw new Error(`PROVIDER_NOT_FOUND: ${providerId} is not configured`)
+  if (!provider.apiKey) throw new Error(`PROVIDER_API_KEY_MISSING: ${provider.id}`)
 
   return {
     id: provider.id,
     name: provider.name,
     apiKey: decryptApiKey(provider.apiKey),
-    baseUrl: normalizeProviderBaseUrl(provider.id, provider.baseUrl),
+    baseUrl: provider.baseUrl,
     apiMode: provider.apiMode,
     gatewayRoute: provider.gatewayRoute,
   }
 }
 
-
-/**
- * 获取用户自定义模型列表（含 EvoLink 预设自动注入）
- */
 export async function getUserModels(userId: string): Promise<CustomModel[]> {
-  const { models, providers } = await readUserConfig(userId)
-
-  // Inject EvoLink presets for evolink providers with API keys
-  const seenKeys = new Set(models.map((m) => `${m.provider}::${m.modelId}`))
-  for (const p of providers) {
-    if (getProviderKey(p.id).toLowerCase() !== 'evolink') continue
-    if (!p.apiKey) continue
-    for (const preset of EVOLINK_MODEL_PRESETS) {
-      const key = `${p.id}::${preset.modelId}`
-      if (seenKeys.has(key)) continue
-      seenKeys.add(key)
-      models.push({
-        modelId: preset.modelId,
-        modelKey: composeModelKey(p.id, preset.modelId),
-        name: preset.name,
-        type: preset.type,
-        provider: p.id,
-        price: 0,
-      })
-    }
-  }
-
-  return models
+  return (await readUserConfig(userId)).models
 }
 
-/**
- * 获取模型关联 provider
- */
 export async function getModelProvider(userId: string, model: string): Promise<string | null> {
   const { models } = await readUserConfig(userId)
-  const matched = findModelByKey(models, model)
-  return matched?.provider || null
+  return findModelByKey(models, model)?.provider || null
 }
 
-/**
- * 获取指定类型模型列表
- */
 export async function getModelsByType(userId: string, type: ModelMediaType): Promise<CustomModel[]> {
   const models = await getUserModels(userId)
   return models.filter((model) => model.type === type)
 }
 
-/**
- * 解析模型 ID（严格从 model_key 提取）
- */
 export async function resolveModelId(userId: string, model: string): Promise<string> {
-  const selection = await resolveModelSelection(userId, model, 'llm')
-  return selection.modelId
+  return (await resolveModelSelection(userId, model, 'llm')).modelId
 }
 
-/**
- * 获取模型价格
- */
 export async function getModelPrice(userId: string, model: string): Promise<number> {
   const { models } = await readUserConfig(userId)
   const matched = findModelByKey(models, model)
-  if (!matched) {
-    throw new Error(`MODEL_NOT_FOUND: ${model}`)
-  }
+  if (!matched) throw new Error(`MODEL_NOT_FOUND: ${model}`)
   return matched.price
 }
 
-/**
- * 根据音频模型键获取音频 API Key（未传模型时要求仅存在单一音频模型）
- */
 export async function getAudioApiKey(userId: string, model?: string | null): Promise<string> {
   const selection = await resolveModelSelectionOrSingle(userId, model, 'audio')
   return (await getProviderConfig(userId, selection.provider)).apiKey
 }
 
-/**
- * 根据口型同步模型键获取 API Key（未传模型时要求仅存在单一 lipsync 模型）
- */
 export async function getLipSyncApiKey(userId: string, model?: string | null): Promise<string> {
   const selection = await resolveModelSelectionOrSingle(userId, model, 'lipsync')
   return (await getProviderConfig(userId, selection.provider)).apiKey
 }
 
-/**
- * 检查用户是否有任意 API 配置
- */
 export async function hasApiConfig(userId: string): Promise<boolean> {
-  const pref = await prisma.userPreference.findUnique({
-    where: { userId },
-    select: { customProviders: true },
-  })
-
-  const providers = parseCustomProviders(pref?.customProviders)
+  const { providers } = await readUserConfig(userId)
   return providers.some((provider) => !!provider.apiKey)
 }
