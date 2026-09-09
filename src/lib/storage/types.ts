@@ -1,4 +1,4 @@
-export type StorageType = 'minio' | 'local' | 'cos' | 'evolink'
+export type StorageType = 'minio' | 'local' | 'cos'
 
 export interface UploadObjectParams {
   key: string
