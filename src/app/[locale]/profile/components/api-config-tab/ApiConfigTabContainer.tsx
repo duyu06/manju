@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { CapabilityValue } from '@/lib/model-config-contract'
 import {
@@ -12,10 +12,7 @@ import {
 import { DefaultModelCards } from './DefaultModelCards'
 import { ApiConfigProviderList } from './ApiConfigProviderList'
 import { ApiConfigToolbar } from './ApiConfigToolbar'
-import { DirectProviderModal } from './DirectProviderModal'
 import { useApiConfigFilters } from './hooks/useApiConfigFilters'
-
-
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -51,7 +48,6 @@ function toCapabilityFieldLabel(field: string): string {
 }
 
 export function ApiConfigTabContainer() {
-  const [showAddProvider, setShowAddProvider] = useState(false)
   const locale = useLocale()
   const {
     providers,
@@ -66,7 +62,6 @@ export function ApiConfigTabContainer() {
     updateProviderApiKey,
     updateProviderBaseUrl,
     reorderProviders,
-    addProvider,
     deleteProvider,
     toggleModel,
     deleteModel,
@@ -107,8 +102,6 @@ export function ApiConfigTabContainer() {
     )
   }
 
-
-
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -130,7 +123,6 @@ export function ApiConfigTabContainer() {
         allModels={models}
         defaultModels={defaultModels}
         getModelsForProvider={getModelsForProvider}
-        onAddGeminiProvider={() => setShowAddProvider(true)}
         onToggleModel={toggleModel}
         onUpdateApiKey={updateProviderApiKey}
         onUpdateBaseUrl={updateProviderBaseUrl}
@@ -151,50 +143,26 @@ export function ApiConfigTabContainer() {
           showHiddenProviders: t('showHiddenProviders'),
           hideHiddenProviders: t('hideHiddenProviders'),
           hiddenProvidersPrefix: t('hiddenProvidersPrefix'),
-          addGeminiProvider: t('addDirectProvider'),
         }}
       />
 
       <DefaultModelCards
-            t={t}
-            defaultModels={defaultModels}
-            getEnabledModelsByType={getEnabledModelsByType}
-            parseModelKey={parseModelKey}
-            encodeModelKey={encodeModelKey}
-            getProviderDisplayName={getProviderDisplayName}
-            locale={locale}
-            updateDefaultModel={updateDefaultModel}
-            batchUpdateDefaultModels={batchUpdateDefaultModels}
-            extractCapabilityFieldsFromModel={extractCapabilityFieldsFromModel}
-            toCapabilityFieldLabel={toCapabilityFieldLabel}
-            capabilityDefaults={capabilityDefaults}
-            updateCapabilityDefault={updateCapabilityDefault}
-            parseBySample={parseBySample}
-            workflowConcurrency={workflowConcurrency}
-            handleWorkflowConcurrencyChange={handleWorkflowConcurrencyChange}
-          />
-
-      <DirectProviderModal
-        open={showAddProvider}
-        onClose={() => setShowAddProvider(false)}
-        onAdd={addProvider}
-        labels={{
-          title: t('directProviderModal.title'),
-          description: t('directProviderModal.description'),
-          apiType: t('apiType'),
-          openaiCompatible: t('apiTypeOpenAICompatible'),
-          geminiCompatible: t('apiTypeGeminiCompatible'),
-          providerName: t('directProviderModal.providerName'),
-          providerNamePlaceholder: t('directProviderModal.providerNamePlaceholder'),
-          baseUrl: t('baseUrl'),
-          baseUrlHint: t('directProviderModal.baseUrlHint'),
-          apiKey: t('apiKeyLabel'),
-          apiKeyPlaceholder: t('enterApiKey'),
-          directNotice: t('directProviderModal.directNotice'),
-          invalidUrl: t('directProviderModal.invalidUrl'),
-          cancel: t('cancel'),
-          add: t('add'),
-        }}
+        t={t}
+        defaultModels={defaultModels}
+        getEnabledModelsByType={getEnabledModelsByType}
+        parseModelKey={parseModelKey}
+        encodeModelKey={encodeModelKey}
+        getProviderDisplayName={getProviderDisplayName}
+        locale={locale}
+        updateDefaultModel={updateDefaultModel}
+        batchUpdateDefaultModels={batchUpdateDefaultModels}
+        extractCapabilityFieldsFromModel={extractCapabilityFieldsFromModel}
+        toCapabilityFieldLabel={toCapabilityFieldLabel}
+        capabilityDefaults={capabilityDefaults}
+        updateCapabilityDefault={updateCapabilityDefault}
+        parseBySample={parseBySample}
+        workflowConcurrency={workflowConcurrency}
+        handleWorkflowConcurrencyChange={handleWorkflowConcurrencyChange}
       />
     </div>
   )
