@@ -22,11 +22,11 @@ export function Footer() {
           <div className="flex-1 max-w-xs">
             <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-small.png" alt="AIDrama" className="h-6 w-auto" />
-              <span className="text-base font-semibold tracking-tight text-[#171717]">AIDrama</span>
+              <img src="/yaoke-logo.png" alt="YAOKE" className="h-8 w-auto" />
+              <span className="text-base font-semibold tracking-tight text-[#171717]">YAOKE</span>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-[#737373]">
-              AI creative platform for video and image generation. Top models, one workspace.
+              AI-powered film production collaboration platform — from idea to final cut, fully traceable.
             </p>
           </div>
 
@@ -73,13 +73,7 @@ export function Footer() {
         {/* Copyright row */}
         <div className="mt-10 pt-6 border-t border-[#e5e5e5] flex flex-col sm:flex-row justify-between items-center gap-2">
           <p className="text-xs text-[#737373]">
-            © 2026 AIDrama. All rights reserved.
-          </p>
-          <p className="text-xs text-[#a3a3a3]">
-            Powered by{' '}
-            <a href="https://evolink.ai" target="_blank" rel="noopener noreferrer" className="hover:text-[#737373] transition-colors">
-              EvoLinkAI
-            </a>
+            © 2026 YAOKE · Product Demo
           </p>
         </div>
       </div>

@@ -54,8 +54,8 @@ export default function SignIn() {
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-2 mb-8">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-small.png" alt="AIDrama" className="h-8 w-auto" />
-            <span className="text-2xl font-bold tracking-tight text-[#171717]">AIDrama</span>
+            <img src="/yaoke-logo.png" alt="YAOKE" className="h-9 w-auto" />
+            <span className="text-2xl font-bold tracking-tight text-[#171717]">YAOKE</span>
           </div>
 
           <h1 className="text-2xl font-semibold text-[#171717]">

@@ -5,7 +5,6 @@ import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { AppIcon } from '@/components/ui/icons'
 
 interface ApiConfigToolbarProps {
-  title: string
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   savingState: ComponentProps<typeof TaskStatusInline>['state'] | null
   savingLabel: string
@@ -14,7 +13,6 @@ interface ApiConfigToolbarProps {
 }
 
 export function ApiConfigToolbar({
-  title,
   saveStatus,
   savingState,
   savingLabel,

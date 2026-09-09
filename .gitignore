@@ -75,6 +75,12 @@ agent/
 docs/
 scripts/migrations/reports/
 scripts/tmp-*
+scripts/setup-demo-api-keys.ts
+yaoke-demo-media.zip
+
+# ── Local tooling artifacts ───────────────────────────────────────────────────
+.playwright-cli/
+output/
 
 # ── GitHub CI workflows ───────────────────────────────────────────────────────
 .github/*

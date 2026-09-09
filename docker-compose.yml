@@ -80,7 +80,7 @@ services:
       REDIS_TLS: ""
       # Storage: default MinIO (S3-compatible)
       STORAGE_TYPE: ${STORAGE_TYPE:-minio}
-      MINIO_ENDPOINT: "${MINIO_ENDPOINT:-http://minio:9000}"
+      MINIO_ENDPOINT: "http://minio:9000"
       MINIO_REGION: "auto"
       MINIO_BUCKET: "aidrama-studio"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
@@ -103,7 +103,7 @@ services:
       QUEUE_CONCURRENCY_VOICE: "20"
       QUEUE_CONCURRENCY_TEXT: "50"
       # Bull Board
-      BULL_BOARD_HOST: "127.0.0.1"
+      BULL_BOARD_HOST: "0.0.0.0"
       BULL_BOARD_PORT: "3010"
       BULL_BOARD_BASE_PATH: "/admin/queues"
       BULL_BOARD_USER: "${BULL_BOARD_USER:-admin}"

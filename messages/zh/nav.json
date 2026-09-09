@@ -1,6 +1,8 @@
 {
-  "workspace": "创作",
-  "assetHub": "素材库",
+  "workspace": "项目中心",
+  "workflows": "制作工作流",
+  "assetHub": "资产中心",
+  "dashboard": "项目驾驶舱",
   "profile": "账户设置",
   "downloadLogs": "导出日志",
   "signin": "登录",

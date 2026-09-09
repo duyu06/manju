@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { CapabilityValue } from '@/lib/model-config-contract'
 import {
@@ -10,6 +10,9 @@ import {
   useProviders,
 } from '../api-config'
 import { DefaultModelCards } from './DefaultModelCards'
+import { ApiConfigProviderList } from './ApiConfigProviderList'
+import { ApiConfigToolbar } from './ApiConfigToolbar'
+import { DirectProviderModal } from './DirectProviderModal'
 import { useApiConfigFilters } from './hooks/useApiConfigFilters'
 
 
@@ -48,6 +51,7 @@ function toCapabilityFieldLabel(field: string): string {
 }
 
 export function ApiConfigTabContainer() {
+  const [showAddProvider, setShowAddProvider] = useState(false)
   const locale = useLocale()
   const {
     providers,
@@ -78,6 +82,8 @@ export function ApiConfigTabContainer() {
   const tc = useTranslations('common')
 
   const {
+    modelProviders,
+    getModelsForProvider,
     getEnabledModelsByType,
   } = useApiConfigFilters({
     providers,
@@ -104,7 +110,51 @@ export function ApiConfigTabContainer() {
 
 
   return (
-    <div>
+    <div className="space-y-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[#171717]">{t('title')}</h2>
+          <p className="mt-1 text-xs text-[#737373]">{t('directApiSummary')}</p>
+        </div>
+        <ApiConfigToolbar
+          saveStatus={saveStatus}
+          savingState={null}
+          savingLabel={t('saving')}
+          savedLabel={t('saved')}
+          saveFailedLabel={t('saveFailed')}
+        />
+      </div>
+
+      <ApiConfigProviderList
+        modelProviders={modelProviders}
+        allModels={models}
+        defaultModels={defaultModels}
+        getModelsForProvider={getModelsForProvider}
+        onAddGeminiProvider={() => setShowAddProvider(true)}
+        onToggleModel={toggleModel}
+        onUpdateApiKey={updateProviderApiKey}
+        onUpdateBaseUrl={updateProviderBaseUrl}
+        onReorderProviders={reorderProviders}
+        onDeleteModel={deleteModel}
+        onUpdateModel={updateModel}
+        onDeleteProvider={deleteProvider}
+        onAddModel={addModel}
+        onFlushConfig={flushConfig}
+        onToggleProviderHidden={updateProviderHidden}
+        labels={{
+          providerPool: t('providerPool'),
+          providerPoolDesc: t('providerPoolDesc'),
+          dragToSort: t('dragToSort'),
+          dragToSortHint: t('dragToSortHint'),
+          hideProvider: t('hideProvider'),
+          showProvider: t('showProvider'),
+          showHiddenProviders: t('showHiddenProviders'),
+          hideHiddenProviders: t('hideHiddenProviders'),
+          hiddenProvidersPrefix: t('hiddenProvidersPrefix'),
+          addGeminiProvider: t('addDirectProvider'),
+        }}
+      />
+
       <DefaultModelCards
             t={t}
             defaultModels={defaultModels}
@@ -123,6 +173,29 @@ export function ApiConfigTabContainer() {
             workflowConcurrency={workflowConcurrency}
             handleWorkflowConcurrencyChange={handleWorkflowConcurrencyChange}
           />
+
+      <DirectProviderModal
+        open={showAddProvider}
+        onClose={() => setShowAddProvider(false)}
+        onAdd={addProvider}
+        labels={{
+          title: t('directProviderModal.title'),
+          description: t('directProviderModal.description'),
+          apiType: t('apiType'),
+          openaiCompatible: t('apiTypeOpenAICompatible'),
+          geminiCompatible: t('apiTypeGeminiCompatible'),
+          providerName: t('directProviderModal.providerName'),
+          providerNamePlaceholder: t('directProviderModal.providerNamePlaceholder'),
+          baseUrl: t('baseUrl'),
+          baseUrlHint: t('directProviderModal.baseUrlHint'),
+          apiKey: t('apiKeyLabel'),
+          apiKeyPlaceholder: t('enterApiKey'),
+          directNotice: t('directProviderModal.directNotice'),
+          invalidUrl: t('directProviderModal.invalidUrl'),
+          cancel: t('cancel'),
+          add: t('add'),
+        }}
+      />
     </div>
   )
 }

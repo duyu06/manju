@@ -36,8 +36,8 @@ export default function Navbar() {
         <div className="flex items-center">
           <Link href={{ pathname: '/' as never }} className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-small.png" alt="AIDrama" className="h-10 w-auto" />
-            <span className="text-xl font-bold tracking-tight text-[#171717]">AIDrama</span>
+            <img src="/yaoke-mark.png" alt="YAOKE" className="h-9 w-auto" />
+            <span className="text-xl font-bold tracking-tight text-[#171717]">YAOKE</span>
           </Link>
         </div>
 
@@ -52,20 +52,25 @@ export default function Navbar() {
                 {t('workspace')}
               </Link>
               <Link
+                href={{ pathname: '/workflows' }}
+                className="text-sm text-[#525252] hover:text-[#171717] font-medium transition-colors"
+              >
+                {t('workflows')}
+              </Link>
+              <Link
                 href={{ pathname: '/workspace/asset-hub' }}
                 className="text-sm text-[#525252] hover:text-[#171717] font-medium transition-colors"
               >
                 {t('assetHub')}
               </Link>
+              <Link
+                href={{ pathname: '/workspace/dashboard' }}
+                className="text-sm text-[#525252] hover:text-[#171717] font-medium transition-colors"
+              >
+                {t('dashboard')}
+              </Link>
             </>
           )}
-          <Link
-            href={{ pathname: '/workflows' }}
-            className="relative text-sm text-[#525252] hover:text-[#171717] font-medium transition-colors"
-          >
-            Workflows
-            <span className="absolute -top-1.5 -right-5 px-1.5 py-px bg-black text-white text-[8px] rounded">NEW</span>
-          </Link>
         </div>
 
         {/* Right: Language + User menu / Auth */}

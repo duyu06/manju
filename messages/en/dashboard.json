@@ -1,0 +1,113 @@
+{
+  "title": "Project Dashboard",
+  "subtitle": "Delivery overview of the AI film production pipeline",
+  "demoBadge": "Demo data · Mock",
+  "project": {
+    "name": "AI Short Drama: 24 Hours Later",
+    "synopsis": "An unemployed programmer obtains an AI assistant that can predict the next 24 hours — but every prediction costs him a random piece of his past memory.",
+    "statusLabel": "Status",
+    "status": "Video Generation",
+    "etaLabel": "Target Delivery",
+    "eta": "09/12",
+    "sprintLabel": "Sprint",
+    "sprint": "Sprint 3 / 4"
+  },
+  "metrics": {
+    "title": "Project Overview",
+    "progress": "Overall Progress",
+    "stage": "Current Stage",
+    "stageValue": "Video Generation",
+    "blockers": "Blockers",
+    "risks": "Risks",
+    "successRate": "AI Generation Success Rate",
+    "budgetUsage": "AI Budget Consumption"
+  },
+  "pipeline": {
+    "title": "Production Pipeline",
+    "subtitle": "Every generation stage includes an AI generate → human review → approve / regenerate gate (Human-in-the-loop)",
+    "statusDone": "Done",
+    "statusInProgress": "In Progress",
+    "statusPending": "Pending",
+    "statusBlocked": "Blocked",
+    "stages": {
+      "requirement": "Requirement Sign-off",
+      "script": "Script Generation",
+      "character": "Character Assets",
+      "scene": "Scene Assets",
+      "storyboard": "Smart Storyboard",
+      "image": "Image Generation",
+      "video": "Video Generation",
+      "voice": "Voiceover",
+      "compose": "Final Composition",
+      "acceptance": "Acceptance & Delivery"
+    }
+  },
+  "issues": {
+    "title": "Risks & Issues",
+    "colId": "ID",
+    "colIssue": "Issue",
+    "colSeverity": "Severity",
+    "colOwner": "Owner",
+    "colStatus": "Status",
+    "items": [
+      {
+        "id": "R-01",
+        "issue": "Character consistency gaps in some lead shots",
+        "severity": "P1",
+        "owner": "AI Generation",
+        "statusKey": "in_progress",
+        "status": "Handling"
+      },
+      {
+        "id": "R-02",
+        "issue": "Video provider latency at peak hours",
+        "severity": "P1",
+        "owner": "Backend",
+        "statusKey": "in_progress",
+        "status": "Monitoring"
+      },
+      {
+        "id": "R-03",
+        "issue": "Shot #12 failed generation 3 times in a row",
+        "severity": "P0",
+        "owner": "AI / Backend",
+        "statusKey": "blocked",
+        "status": "Blocked"
+      },
+      {
+        "id": "R-04",
+        "issue": "Per-episode cost may exceed budget by 10%",
+        "severity": "P1",
+        "owner": "PM",
+        "statusKey": "in_progress",
+        "status": "Optimizing"
+      }
+    ]
+  },
+  "funnel": {
+    "title": "Shot Production Funnel (Episode 1)",
+    "colItem": "Stage",
+    "colCount": "Count",
+    "items": [
+      { "label": "Total shots", "count": 24 },
+      { "label": "Storyboards completed", "count": 24 },
+      { "label": "Images generated", "count": 24 },
+      { "label": "Images approved", "count": 21 },
+      { "label": "Videos generated", "count": 18 },
+      { "label": "Videos approved", "count": 16 },
+      { "label": "In progress", "count": 2 },
+      { "label": "Failed / retrying", "count": 2 }
+    ]
+  },
+  "kpi": {
+    "title": "Production KPIs",
+    "items": [
+      { "label": "Storyboard Completion", "value": "100%" },
+      { "label": "Image Success Rate", "value": "95.8%" },
+      { "label": "Video Success Rate", "value": "83.3%" },
+      { "label": "First-pass Review Rate", "value": "76.2%" },
+      { "label": "Avg. Shot Generation Time", "value": "72s" },
+      { "label": "Avg. Cost per Shot", "value": "¥1.84" }
+    ]
+  }
+}

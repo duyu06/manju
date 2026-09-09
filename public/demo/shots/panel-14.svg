@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1280" viewBox="0 0 720 1280">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="0.5" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="1280" fill="url(#g)"/>
+  <circle cx="600" cy="220" r="180" fill="#1d4ed8" opacity="0.18"/>
+  <circle cx="120" cy="1050" r="240" fill="#7c3aed" opacity="0.14"/>
+  <path d="M60 1100 L180 940 L300 1030 L430 860 L560 960 L660 900" fill="none" stroke="#60a5fa" stroke-width="3" opacity="0.35"/>
+  <text x="360" y="600" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#ffffff" opacity="0.92">SHOT 14</text>
+  <text x="360" y="660" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#94a3b8">24 HOURS LATER · DEMO PLACEHOLDER</text>
+  <rect x="220" y="700" width="280" height="3" fill="#3b82f6" opacity="0.6"/>
+</svg>

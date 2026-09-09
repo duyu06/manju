@@ -1,0 +1,113 @@
+{
+  "title": "项目驾驶舱",
+  "subtitle": "AI 影视生产交付全局视图",
+  "demoBadge": "演示数据 · Mock",
+  "project": {
+    "name": "AI 短剧《24小时之后》",
+    "synopsis": "一个失业程序员偶然获得一个能够预测未来 24 小时的 AI 助手，但每使用一次预测能力，就会随机失去一段过去的记忆。",
+    "statusLabel": "项目状态",
+    "status": "视频生成中",
+    "etaLabel": "预计交付",
+    "eta": "09/12",
+    "sprintLabel": "迭代周期",
+    "sprint": "Sprint 3 / 4"
+  },
+  "metrics": {
+    "title": "项目概况",
+    "progress": "总体进度",
+    "stage": "项目阶段",
+    "stageValue": "视频生成",
+    "blockers": "Blocker",
+    "risks": "风险项",
+    "successRate": "AI 生成成功率",
+    "budgetUsage": "AI 成本预算消耗"
+  },
+  "pipeline": {
+    "title": "生产 Pipeline",
+    "subtitle": "每个生成阶段均设置「AI 生成 → 人工审核 → 通过 / 重生成」卡点（Human-in-the-loop）",
+    "statusDone": "已完成",
+    "statusInProgress": "进行中",
+    "statusPending": "未开始",
+    "statusBlocked": "Blocked",
+    "stages": {
+      "requirement": "需求确认",
+      "script": "剧本生成",
+      "character": "角色资产",
+      "scene": "场景资产",
+      "storyboard": "智能分镜",
+      "image": "图片生成",
+      "video": "视频生成",
+      "voice": "配音",
+      "compose": "成片合成",
+      "acceptance": "验收交付"
+    }
+  },
+  "issues": {
+    "title": "风险与问题",
+    "colId": "ID",
+    "colIssue": "问题描述",
+    "colSeverity": "等级",
+    "colOwner": "Owner",
+    "colStatus": "状态",
+    "items": [
+      {
+        "id": "R-01",
+        "issue": "主角部分镜头人物一致性不足",
+        "severity": "P1",
+        "owner": "AI 生成",
+        "statusKey": "in_progress",
+        "status": "处理中"
+      },
+      {
+        "id": "R-02",
+        "issue": "视频 Provider 高峰期生成延迟",
+        "severity": "P1",
+        "owner": "后端",
+        "statusKey": "in_progress",
+        "status": "监控中"
+      },
+      {
+        "id": "R-03",
+        "issue": "第 12 镜连续生成失败 3 次",
+        "severity": "P0",
+        "owner": "AI / 后端",
+        "statusKey": "blocked",
+        "status": "Blocked"
+      },
+      {
+        "id": "R-04",
+        "issue": "单集成本可能超过预算 10%",
+        "severity": "P1",
+        "owner": "PM",
+        "statusKey": "in_progress",
+        "status": "优化中"
+      }
+    ]
+  },
+  "funnel": {
+    "title": "镜头生产漏斗（第 1 集）",
+    "colItem": "环节",
+    "colCount": "数量",
+    "items": [
+      { "label": "总镜头数", "count": 24 },
+      { "label": "已完成分镜", "count": 24 },
+      { "label": "已生成图片", "count": 24 },
+      { "label": "图片审核通过", "count": 21 },
+      { "label": "视频生成完成", "count": 18 },
+      { "label": "视频审核通过", "count": 16 },
+      { "label": "处理中", "count": 2 },
+      { "label": "失败待重试", "count": 2 }
+    ]
+  },
+  "kpi": {
+    "title": "生产 KPI",
+    "items": [
+      { "label": "分镜完成率", "value": "100%" },
+      { "label": "图片生成成功率", "value": "95.8%" },
+      { "label": "视频生成成功率", "value": "83.3%" },
+      { "label": "一次审核通过率", "value": "76.2%" },
+      { "label": "平均镜头生成耗时", "value": "72s" },
+      { "label": "单镜平均成本", "value": "¥1.84" }
+    ]
+  }
+}

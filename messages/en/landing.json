@@ -1,40 +1,40 @@
 {
   "hero": {
-    "titleLine1": "Turn Stories into",
-    "titleHighlight": "Short Dramas",
-    "titleSuffix": " with AI",
-    "subtitle": "Go from Idea to Multi-scene Video in Minutes — Powered by Cinematic AI Models like Kling and Seedance 2.0.",
-    "ctaLoggedIn": "Start Creating",
-    "ctaLoggedOut": "Start Creating — It's Free",
-    "noCreditCard": "No credit card required"
+    "titleLine1": "From Idea to Final Cut",
+    "titleHighlight": "AI-Driven Production Pipeline",
+    "titleSuffix": "",
+    "subtitle": "Creative brief, outline, script, characters, storyboard, visuals, video, and voiceover — unified collaboration that upgrades AI content production from single-point tools to a standardized workflow.",
+    "ctaLoggedIn": "Enter Production Hub",
+    "ctaLoggedOut": "Try the Workflow",
+    "noCreditCard": "PM interview demo build"
   },
   "showcase": {
-    "title": "Short Dramas Created with AIDrama"
+    "title": "AI Film Production Showcase"
   },
-  "title": "AI Video Studio",
-  "subtitle": "AI Film & TV Studio",
-  "enterWorkspace": "Enter Workspace",
+  "title": "YAOKE",
+  "subtitle": "AI Film Production Platform",
+  "enterWorkspace": "Enter Project Workspace",
   "loading": "Loading...",
-  "getStarted": "Get Started",
-  "learnMore": "Learn More",
+  "getStarted": "Create Project",
+  "learnMore": "Explore the Workflow",
   "features": {
-    "title": "Unleash Infinite Creativity",
-    "subtitle": "Full-process AI assistance, from script to final cut",
+    "title": "One Complete AI Content Production Workflow",
+    "subtitle": "From requirement intake to final delivery — fully traceable",
     "character": {
-      "title": "Character Workshop",
-      "description": "Create unique anime characters with high consistency"
+      "title": "Character Asset Hub",
+      "description": "Unified management of character profiles, references, and consistency assets"
     },
     "storyboard": {
       "title": "Smart Storyboard",
-      "description": "One-click text to storyboard, precise narrative control"
+      "description": "Structured breakdown of scripts into executable shot tasks"
     },
     "world": {
-      "title": "World Building",
-      "description": "Immersive scene generation to build grand story backgrounds"
+      "title": "Production Workflow",
+      "description": "Connect script, assets, storyboard, generation, review, and delivery"
     }
   },
   "footer": {
-    "copyright": "2026 AIDrama. All rights reserved.",
-    "poweredBy": "Powered by EvoLinkAI"
+    "copyright": "2026 YAOKE · Demo",
+    "poweredBy": "Based on open-source AIDrama Studio"
   }
 }

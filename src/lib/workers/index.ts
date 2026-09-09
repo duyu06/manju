@@ -7,7 +7,7 @@ import { createTextWorker } from './text.worker'
 
 const workers = [createImageWorker(), createVideoWorker(), createVoiceWorker(), createTextWorker()]
 
-_ulogInfo('[AIDrama] Worker engine starting — powered by EvoLinkAI', { pools: workers.length })
+_ulogInfo('[YAOKE] Worker engine starting', { pools: workers.length })
 
 for (const worker of workers) {
   worker.on('ready', () => {

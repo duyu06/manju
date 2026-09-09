@@ -72,6 +72,8 @@ function normalizeProviderBaseUrl(providerId: string, rawBaseUrl?: string): stri
 
   try {
     const parsed = new URL(baseUrl)
+    // 智谱开放平台使用 /api/paas/v4 作为版本段（无 v1），不能追加 /v1
+    if (parsed.hostname.endsWith('bigmodel.cn')) return baseUrl
     const pathSegments = parsed.pathname.split('/').filter(Boolean)
     const hasV1 = pathSegments.includes('v1')
     if (hasV1) return baseUrl

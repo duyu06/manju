@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAuth, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler } from '@/lib/api-errors'
-import { getProviderConfig } from '@/lib/api-config'
+import { requireOptionalAuthWithEvoLinkKey } from '@/lib/providers/evolink/server-key'
 import { EVOLINK_API_BASE } from '@/lib/providers/evolink/constants'
 
 export const POST = apiHandler(async (request: NextRequest) => {
-  const authResult = await requireUserAuth()
-  if (isErrorResponse(authResult)) return authResult
-  const { session } = authResult
+  const auth = await requireOptionalAuthWithEvoLinkKey()
+  if (auth.error) return auth.error
+  const { apiKey } = auth
 
   const body = await request.json()
   const step = body.step as string
-
-  const { apiKey } = await getProviderConfig(session.user.id, 'evolink')
-  if (!apiKey) {
-    return NextResponse.json({ error: 'EvoLink API key not configured' }, { status: 400 })
-  }
 
   let endpoint: string
   let payload: Record<string, unknown>

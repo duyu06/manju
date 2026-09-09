@@ -1,24 +1,28 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
+import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { AppIcon, type AppIconName } from '@/components/ui/icons'
 
 interface SidebarItem {
   id: string
-  label: string
+  labelKey: 'workspace' | 'workflows' | 'assetHub' | 'dashboard'
   icon: AppIconName
   href: string
 }
 
 const NAV_ITEMS: SidebarItem[] = [
-  { id: 'workspace', label: 'Create', icon: 'monitor', href: '/workspace' },
-  { id: 'asset-hub', label: 'Gallery', icon: 'folderHeart', href: '/workspace/asset-hub' },
+  { id: 'workspace', labelKey: 'workspace', icon: 'monitor', href: '/workspace' },
+  { id: 'workflows', labelKey: 'workflows', icon: 'clapperboard', href: '/workflows' },
+  { id: 'dashboard', labelKey: 'dashboard', icon: 'statsBar', href: '/workspace/dashboard' },
+  { id: 'asset-hub', labelKey: 'assetHub', icon: 'folderHeart', href: '/workspace/asset-hub' },
 ]
 
 export default function AppSidebar() {
   const pathname = usePathname() ?? ''
   const { data: session } = useSession()
+  const t = useTranslations('nav')
   const userName = session?.user?.name || 'User'
   const userInitial = userName.charAt(0).toUpperCase()
 
@@ -42,7 +46,11 @@ export default function AppSidebar() {
         {NAV_ITEMS.map(item => {
           const isActive = item.id === 'asset-hub'
             ? pathname.includes('/asset-hub')
-            : pathname.endsWith('/workspace') || !!pathname.match(/\/workspace\?/)
+            : item.id === 'dashboard'
+              ? pathname.includes('/workspace/dashboard')
+              : item.id === 'workflows'
+                ? pathname.includes('/workflows')
+                : pathname.endsWith('/workspace') || !!pathname.match(/\/workspace\?/)
 
           return (
             <Link
@@ -55,7 +63,7 @@ export default function AppSidebar() {
               }`}
             >
               <AppIcon name={item.icon} className="w-4 h-4" />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </Link>
           )
         })}

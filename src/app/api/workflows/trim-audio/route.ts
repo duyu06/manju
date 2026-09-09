@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAuth, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler } from '@/lib/api-errors'
-import { getProviderConfig } from '@/lib/api-config'
+import { requireOptionalAuthWithEvoLinkKey } from '@/lib/providers/evolink/server-key'
 
 const EVOLINK_FILES_API = 'https://files-api.evolink.ai'
 
 export const POST = apiHandler(async (request: NextRequest) => {
-  const authResult = await requireUserAuth()
-  if (isErrorResponse(authResult)) return authResult
-  const { session } = authResult
+  const auth = await requireOptionalAuthWithEvoLinkKey()
+  if (auth.error) return auth.error
+  const { apiKey } = auth
 
   const body = await request.json()
   const { audioUrl, duration = 10 } = body
 
   if (!audioUrl) {
     return NextResponse.json({ error: 'Missing audioUrl' }, { status: 400 })
-  }
-
-  const { apiKey } = await getProviderConfig(session.user.id, 'evolink')
-  if (!apiKey) {
-    return NextResponse.json({ error: 'EvoLink API key not configured' }, { status: 400 })
   }
 
   const targetDuration = Math.max(4, Math.min(15, Number(duration)))

@@ -133,14 +133,6 @@ export default function WorkflowsPage() {
             <a href="#workflows" className="px-7 py-3.5 bg-[#0a0a0a] text-white rounded-full text-[15px] font-medium hover:bg-[#333] transition">
               {t('hero.browse')}
             </a>
-            <a
-              href="https://github.com/EvoLinkAI/GPT-Image-2-Seedance2-Workflow"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3.5 bg-white text-[#0a0a0a] border border-[#d4d4d4] rounded-full text-[15px] font-medium hover:border-[#0a0a0a] transition"
-            >
-              {t('hero.github')}
-            </a>
           </div>
           <div className="text-[13px] text-[#888] mt-3.5">{t('hero.meta', { count: WORKFLOWS.length })}</div>
         </div>
@@ -183,19 +175,11 @@ export default function WorkflowsPage() {
 
         {/* Submit CTA */}
         <div className="py-10 px-10 bg-gradient-to-br from-[#fafafa] to-[#f5f5f5] border-t border-[#f0f0f0]">
-          <div className="max-w-[1100px] mx-auto flex items-center justify-between flex-wrap gap-6">
+          <div className="max-w-[1100px] mx-auto text-center">
             <div>
               <h3 className="font-mono text-[22px] font-normal tracking-tight mb-2">{t('submit.title')}</h3>
               <p className="text-[14px] text-[#555]">{t('submit.subtitle')}</p>
             </div>
-            <a
-              href="https://github.com/EvoLinkAI/GPT-Image-2-Seedance2-Workflow/issues/new"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-7 py-3.5 bg-[#0a0a0a] text-white rounded-full text-[15px] font-medium hover:bg-[#333] transition"
-            >
-              {t('submit.cta')}
-            </a>
           </div>
         </div>
 

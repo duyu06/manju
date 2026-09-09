@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react'
 import { useTranslations } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import AppSidebar from '@/components/AppSidebar'
-import { EvolinkApiKeyCard } from './components/EvolinkApiKeyCard'
 import ApiConfigTab from './components/ApiConfigTab'
 import { useRouter } from '@/i18n/navigation'
 
@@ -35,14 +34,11 @@ export default function ProfilePage() {
           {/* Settings header */}
           <div className="border-b border-[#e5e5e5] bg-white px-8 py-6">
             <h1 className="text-2xl font-semibold text-[#171717]">Settings</h1>
-            <p className="text-sm text-[#525252] mt-1">Configure your EvoLink API connection</p>
+            <p className="text-sm text-[#525252] mt-1">Configure your API connection</p>
           </div>
 
           {/* Settings Content */}
           <div className="px-8 py-6 space-y-4">
-            <div className="bg-white border border-[#e5e5e5] rounded-xl p-6">
-              <EvolinkApiKeyCard />
-            </div>
             <div className="bg-white border border-[#e5e5e5] rounded-xl p-6">
               <ApiConfigTab />
             </div>

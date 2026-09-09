@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import { AppIcon } from '@/components/ui/icons'
-import { Link, useRouter } from '@/i18n/navigation'
+import { Link } from '@/i18n/navigation'
 import { getWorkflowBySlug, WORKFLOWS, localizeWorkflow } from '../workflow-data'
 import { useLocale } from 'next-intl'
 import { useWorkflowRun } from '../hooks/useWorkflowRun'
@@ -18,14 +17,12 @@ const TABS = ['steps', 'prompts', 'tips'] as const
 type TabKey = (typeof TABS)[number]
 
 export default function WorkflowDetailPage() {
-  const { data: session } = useSession()
   const params = useParams() ?? {}
   const slug = typeof params.slug === 'string' ? params.slug : ''
   const locale = useLocale()
   const rawWorkflow = getWorkflowBySlug(slug)
   const workflow = rawWorkflow ? localizeWorkflow(rawWorkflow, locale) : undefined
   const wf = useWorkflowRun()
-  const router = useRouter()
   const t = useTranslations('workflows.detail')
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
@@ -51,10 +48,6 @@ export default function WorkflowDetailPage() {
 
   const handleRun = useCallback(() => {
     if (!workflow || !allFieldsFilled) return
-    if (!session) {
-      router.push({ pathname: '/auth/signin' })
-      return
-    }
     trackEvent('workflow_run')
 
     let imagePrompt = workflow.prompts[0]?.text || ''
@@ -80,7 +73,7 @@ export default function WorkflowDetailPage() {
         musicTitle: 'Workflow Track',
       } : {}),
     })
-  }, [workflow, fieldValues, allFieldsFilled, imageModel, ratio, duration, wf, session, router])
+  }, [workflow, fieldValues, allFieldsFilled, imageModel, ratio, duration, wf])
 
   if (!workflow) {
     return (
@@ -213,11 +206,9 @@ export default function WorkflowDetailPage() {
               disabled={!allFieldsFilled || (wf.status !== 'idle' && wf.status !== 'video_done')}
               className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-full text-[13px] font-medium hover:bg-[#333] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {!session
-                ? t('loginRequired')
-                : wf.status === 'idle' || wf.status === 'video_done'
-                  ? t('run')
-                  : t('running')}
+              {wf.status === 'idle' || wf.status === 'video_done'
+                ? t('run')
+                : t('running')}
             </button>
 
             {wf.status !== 'idle' && (

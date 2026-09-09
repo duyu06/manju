@@ -1,6 +1,8 @@
 {
-  "workspace": "Create",
-  "assetHub": "Gallery",
+  "workspace": "Projects",
+  "workflows": "Workflows",
+  "assetHub": "Assets",
+  "dashboard": "Dashboard",
   "profile": "Account",
   "downloadLogs": "Export Logs",
   "signin": "Sign In",

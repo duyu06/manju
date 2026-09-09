@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAuth, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler } from '@/lib/api-errors'
-import { getProviderConfig } from '@/lib/api-config'
+import { requireOptionalAuthWithEvoLinkKey } from '@/lib/providers/evolink/server-key'
 import { EVOLINK_API_BASE } from '@/lib/providers/evolink/constants'
 
 export const GET = apiHandler(async (
   _request: NextRequest,
   context: { params: Promise<{ taskId: string }> },
 ) => {
-  const authResult = await requireUserAuth()
-  if (isErrorResponse(authResult)) return authResult
-  const { session } = authResult
+  const auth = await requireOptionalAuthWithEvoLinkKey()
+  if (auth.error) return auth.error
+  const { apiKey } = auth
 
   const { taskId } = await context.params
-  const { apiKey } = await getProviderConfig(session.user.id, 'evolink')
 
   const response = await fetch(`${EVOLINK_API_BASE}/tasks/${encodeURIComponent(taskId)}`, {
     headers: { Authorization: `Bearer ${apiKey}` },

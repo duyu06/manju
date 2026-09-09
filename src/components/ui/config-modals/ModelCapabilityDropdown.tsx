@@ -62,6 +62,8 @@ export interface ModelCapabilityDropdownProps {
     onCapabilityChange: (field: string, rawValue: string, sample: CapabilityValue) => void
     /** Optional: label text to show when no model is selected */
     placeholder?: string
+    /** Optional: message rendered when there are no selectable models */
+    emptyMessage?: string
     /** Optional: compact mode for smaller card contexts */
     compact?: boolean
     /** Optional: extra boolean toggles rendered in param section */
@@ -119,6 +121,7 @@ export function ModelCapabilityDropdown({
     capabilityOverrides,
     onCapabilityChange,
     placeholder,
+    emptyMessage,
     compact = false,
     booleanToggles = [],
     placementMode = 'auto',
@@ -287,7 +290,12 @@ export function ModelCapabilityDropdown({
                 >
                     {/* Model list */}
                     <div className="min-h-[80px] flex-1 overflow-y-auto custom-scrollbar">
-                        {(() => {
+                        {models.length === 0 ? (
+                            <div className="flex min-h-[96px] items-center justify-center gap-2 px-4 py-6 text-center text-sm text-[#737373]">
+                                <AppIcon name="info" className="h-4 w-4 shrink-0" />
+                                <span>{emptyMessage || placeholder || t('pleaseSelect')}</span>
+                            </div>
+                        ) : (() => {
                             // Group models by provider
                             const grouped = new Map<string, ModelCapabilityOption[]>()
                             for (const m of models) {

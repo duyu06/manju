@@ -66,6 +66,7 @@ export const BANANA_RESOLUTION_OPTIONS = [
 export const BANANA_MODELS = ['banana', 'banana-2', 'gemini-3-pro-image-preview', 'gemini-3-pro-image-preview-batch']
 
 export const VIDEO_MODELS = [
+  { value: 'doubao-seedance-2-5-260628', label: 'Seedance 2.5（Ark 直连）' },
   { value: 'doubao-seedance-1-0-pro-fast-251015', label: 'Seedance 1.0 Pro Fast' },
   { value: 'doubao-seedance-1-0-pro-fast-251015-batch', label: 'Seedance 1.0 Pro Fast (Batch) -50%' },
   { value: 'doubao-seedance-1-0-lite-i2v-250428', label: 'Seedance 1.0 Lite' },

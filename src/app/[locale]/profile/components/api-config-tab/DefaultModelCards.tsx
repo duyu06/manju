@@ -129,7 +129,7 @@ function SmartSelector({
                     value: opt.modelKey,
                     label: opt.name,
                     provider: opt.provider,
-                    providerName: '',
+                    providerName: opt.providerName || props.getProviderDisplayName(opt.provider, locale),
                 }))}
                 value={normalizedKey || undefined}
                 onModelChange={(newModelKey) => {
@@ -162,6 +162,7 @@ function SmartSelector({
                     props.updateCapabilityDefault(current.modelKey, capField, props.parseBySample(rawValue, sample))
                 }}
                 placeholder={placeholder}
+                emptyMessage={t('noEnabledModels')}
             />
         )
     }
@@ -199,7 +200,6 @@ export function DefaultModelCards(allProps: DefaultModelCardsProps) {
         encodeModelKey,
         getProviderDisplayName,
         locale,
-        updateDefaultModel,
         extractCapabilityFieldsFromModel,
         workflowConcurrency,
         handleWorkflowConcurrencyChange,
@@ -357,7 +357,7 @@ export function DefaultModelCards(allProps: DefaultModelCardsProps) {
                             value: opt.modelKey,
                             label: opt.name,
                             provider: opt.provider,
-                            providerName: '',
+                            providerName: opt.providerName || getProviderDisplayName(opt.provider, locale),
                         }))}
                         value={pipelineGlobalKey || undefined}
                         onModelChange={handlePipelineGlobalChange}
@@ -368,6 +368,7 @@ export function DefaultModelCards(allProps: DefaultModelCardsProps) {
                         capabilityOverrides={pipelineGlobalCapOverrides}
                         onCapabilityChange={handlePipelineGlobalCapChange}
                         placeholder={t('defaultModelSection.unifiedOverridePlaceholder')}
+                        emptyMessage={t('noEnabledModels')}
                     />
                 </div>
 

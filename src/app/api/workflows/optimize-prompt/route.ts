@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAuth, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler } from '@/lib/api-errors'
-import { getProviderConfig } from '@/lib/api-config'
+import { requireOptionalAuthWithEvoLinkKey } from '@/lib/providers/evolink/server-key'
 import { EVOLINK_API_BASE } from '@/lib/providers/evolink/constants'
 
 function buildSystemPrompt(duration: number): string {
@@ -50,9 +49,9 @@ Write a single flowing prompt that follows the time axis structure. Start with t
 }
 
 export const POST = apiHandler(async (request: NextRequest) => {
-  const authResult = await requireUserAuth()
-  if (isErrorResponse(authResult)) return authResult
-  const { session } = authResult
+  const auth = await requireOptionalAuthWithEvoLinkKey()
+  if (auth.error) return auth.error
+  const { apiKey } = auth
 
   const body = await request.json()
   const { imageUrl, imagePrompt, videoPromptTemplate, duration = 10 } = body
@@ -60,12 +59,6 @@ export const POST = apiHandler(async (request: NextRequest) => {
   if (!imageUrl || !imagePrompt) {
     console.error('[optimize-prompt] Missing fields:', { imageUrl: !!imageUrl, imagePrompt: !!imagePrompt })
     return NextResponse.json({ error: 'Missing imageUrl or imagePrompt' }, { status: 400 })
-  }
-
-  const { apiKey } = await getProviderConfig(session.user.id, 'evolink')
-  if (!apiKey) {
-    console.error('[optimize-prompt] No API key for user:', session.user.id)
-    return NextResponse.json({ error: 'EvoLink API key not configured' }, { status: 400 })
   }
 
   const systemPrompt = buildSystemPrompt(Number(duration))

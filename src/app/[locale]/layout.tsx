@@ -38,9 +38,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
         title: t('title'),
         description: t('description'),
         icons: {
-            icon: '/favicon.svg',
-            shortcut: '/favicon.svg',
-            apple: '/favicon.svg',
+            icon: '/yaoke-favicon.png',
+            shortcut: '/yaoke-favicon.png',
+            apple: '/yaoke-favicon.png',
         },
         openGraph: {
             url: appUrl,
