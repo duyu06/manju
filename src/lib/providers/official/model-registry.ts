@@ -1,4 +1,5 @@
-export type OfficialProviderKey = 'bailian' | 'siliconflow' | 'evolink'
+import type { OfficialProviderKey } from './provider-policy'
+
 export type OfficialModelModality = 'llm' | 'image' | 'video' | 'audio'
 
 interface RegisterOfficialModelInput {
