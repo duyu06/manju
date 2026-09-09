@@ -1,4 +1,13 @@
-export type OfficialProviderKey = 'bailian' | 'siliconflow' | 'evolink'
+export type OfficialProviderKey =
+  | 'openai'
+  | 'google'
+  | 'anthropic'
+  | 'bailian'
+  | 'ark'
+  | 'minimax'
+  | 'vidu'
+  | 'imagen'
+
 export type OfficialModelModality = 'llm' | 'image' | 'video' | 'audio'
 
 interface RegisterOfficialModelInput {
