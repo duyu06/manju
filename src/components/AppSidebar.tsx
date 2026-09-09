@@ -7,14 +7,13 @@ import { AppIcon, type AppIconName } from '@/components/ui/icons'
 
 interface SidebarItem {
   id: string
-  labelKey: 'workspace' | 'workflows' | 'assetHub' | 'dashboard'
+  labelKey: 'workspace' | 'assetHub' | 'dashboard'
   icon: AppIconName
   href: string
 }
 
 const NAV_ITEMS: SidebarItem[] = [
   { id: 'workspace', labelKey: 'workspace', icon: 'monitor', href: '/workspace' },
-  { id: 'workflows', labelKey: 'workflows', icon: 'clapperboard', href: '/workflows' },
   { id: 'dashboard', labelKey: 'dashboard', icon: 'statsBar', href: '/workspace/dashboard' },
   { id: 'asset-hub', labelKey: 'assetHub', icon: 'folderHeart', href: '/workspace/asset-hub' },
 ]
@@ -28,7 +27,6 @@ export default function AppSidebar() {
 
   return (
     <aside className="w-[200px] flex-shrink-0 bg-white border-r border-[#e5e5e5] flex flex-col overflow-y-auto">
-      {/* User info */}
       <div className="p-4 border-b border-[#e5e5e5]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[#171717] text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
@@ -41,16 +39,13 @@ export default function AppSidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="p-3 space-y-1">
         {NAV_ITEMS.map(item => {
           const isActive = item.id === 'asset-hub'
             ? pathname.includes('/asset-hub')
             : item.id === 'dashboard'
               ? pathname.includes('/workspace/dashboard')
-              : item.id === 'workflows'
-                ? pathname.includes('/workflows')
-                : pathname.endsWith('/workspace') || !!pathname.match(/\/workspace\?/)
+              : pathname.endsWith('/workspace') || !!pathname.match(/\/workspace\?/)
 
           return (
             <Link
@@ -69,7 +64,6 @@ export default function AppSidebar() {
         })}
       </nav>
 
-      {/* Bottom: Settings + Sign Out — pinned to bottom */}
       <div className="mt-auto p-3 border-t border-[#e5e5e5] space-y-1">
         <Link
           href={{ pathname: '/profile' as never }}
