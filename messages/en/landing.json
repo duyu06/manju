@@ -6,13 +6,13 @@
     "subtitle": "Creative brief, outline, script, characters, storyboard, visuals, video, and voiceover — unified collaboration that upgrades AI content production from single-point tools to a standardized workflow.",
     "ctaLoggedIn": "Enter Production Hub",
     "ctaLoggedOut": "Try the Workflow",
-    "noCreditCard": "PM interview demo build"
+    "noCreditCard": "AI product manager interview demo build"
   },
   "showcase": {
     "title": "AI Film Production Showcase"
   },
-  "title": "YAOKE",
-  "subtitle": "AI Film Production Platform",
+  "title": "DramaFlow Studio",
+  "subtitle": "AI Short-Drama Production Platform",
   "enterWorkspace": "Enter Project Workspace",
   "loading": "Loading...",
   "getStarted": "Create Project",
@@ -34,7 +34,7 @@
     }
   },
   "footer": {
-    "copyright": "2026 YAOKE · Demo",
-    "poweredBy": "Based on open-source AIDrama Studio"
+    "copyright": "2026 DramaFlow Studio · Demo",
+    "poweredBy": "Productized from the open-source AIDrama Studio foundation"
   }
 }
