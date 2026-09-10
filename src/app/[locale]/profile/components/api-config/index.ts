@@ -1,4 +1,3 @@
-export { ProviderSection } from './ProviderSection'
 export { DefaultModelSection } from './DefaultModelSection'
 export { ProviderCard } from './ProviderCard'
 export { useProviders } from './hooks'
