@@ -28,15 +28,12 @@ function createState(tutorial: ProviderTutorial): UseProviderCardStateResult {
   return {
     providerKey: 'ark',
     isPresetProvider: true,
-    showBaseUrlEdit: false,
     tutorial,
     groupedModels: {},
     hasModels: false,
     isEditing: false,
-    isEditingUrl: false,
     showKey: false,
     tempKey: '',
-    tempUrl: '',
     showTutorial: true,
     showAddForm: null,
     newModel: {
@@ -69,41 +66,19 @@ function createState(tutorial: ProviderTutorial): UseProviderCardStateResult {
     setNewModel: () => undefined,
     setEditModel: () => undefined,
     setTempKey: () => undefined,
-    setTempUrl: () => undefined,
     startEditKey: () => undefined,
-    startEditUrl: () => undefined,
-    handleSaveKey: () => Promise.resolve(),
+    handleSaveKey: () => undefined,
     handleCancelEdit: () => undefined,
-    handleSaveUrl: () => undefined,
-    handleCancelUrlEdit: () => undefined,
     handleEditModel: () => undefined,
     handleCancelEditModel: () => undefined,
-    handleSaveModel: () => Promise.resolve(),
-    handleAddModel: () => Promise.resolve(),
+    handleSaveModel: async () => undefined,
+    handleAddModel: async () => undefined,
     handleCancelAdd: () => undefined,
-    needsCustomPricing: false,
     keyTestStatus: 'idle',
     keyTestSteps: [],
-    handleForceSaveKey: () => undefined,
     handleTestOnly: () => undefined,
     handleDismissTest: () => undefined,
     isModelSavePending: false,
-    assistantEnabled: false,
-    isAssistantOpen: false,
-    assistantSavedEvent: null,
-    assistantChat: {
-      messages: [],
-      input: '',
-      status: 'ready',
-      pending: false,
-      error: undefined,
-      setInput: () => undefined,
-      send: async () => undefined,
-      clear: () => undefined,
-    },
-    openAssistant: () => undefined,
-    closeAssistant: () => undefined,
-    handleAssistantSend: () => Promise.resolve(),
   }
 }
 
@@ -129,7 +104,7 @@ describe('ProviderCardShell tutorial modal', () => {
     Reflect.deleteProperty(globalThis, 'document')
   })
 
-  it('mounts the tutorial modal through a portal to document.body', () => {
+  it('mounts the official provider tutorial modal through document.body', () => {
     const fakeDocument = {
       body: { nodeName: 'BODY' },
     }
@@ -142,7 +117,7 @@ describe('ProviderCardShell tutorial modal', () => {
       steps: [
         {
           text: 'ark_step1',
-          url: 'https://example.com/ark-key',
+          url: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey?apikey=%7B%7D',
         },
       ],
     }
@@ -151,7 +126,7 @@ describe('ProviderCardShell tutorial modal', () => {
       if (key === 'tutorial.button') return '开通教程'
       if (key === 'tutorial.title') return '开通教程'
       if (key === 'tutorial.subtitle') return '按照以下步骤完成配置'
-      if (key === 'tutorial.steps.ark_step1') return '进入控制台创建 API Key'
+      if (key === 'tutorial.steps.ark_step1') return '进入官方控制台创建 API Key'
       if (key === 'tutorial.openLink') return '点击打开'
       if (key === 'tutorial.close') return '关闭'
       return key
@@ -163,7 +138,7 @@ describe('ProviderCardShell tutorial modal', () => {
         {
           provider: {
             id: 'ark',
-            name: '阿里云百炼',
+            name: '火山引擎 Ark',
             hasApiKey: true,
           },
           onDeleteProvider: () => undefined,
@@ -176,7 +151,7 @@ describe('ProviderCardShell tutorial modal', () => {
     expect(portalMocks.createPortalMock).toHaveBeenCalledTimes(1)
     expect(portalMocks.createPortalMock.mock.calls[0]?.[1]).toBe(fakeDocument.body)
     expect(html).toContain('data-portal-target="body"')
-    expect(html).toContain('进入控制台创建 API Key')
-    expect(html).toContain('href="https://example.com/ark-key"')
+    expect(html).toContain('进入官方控制台创建 API Key')
+    expect(html).toContain('console.volcengine.com')
   })
 })
