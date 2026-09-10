@@ -6,7 +6,6 @@
  */
 
 import { logInternal } from './logging/semantic'
-import { buildFalQueueUrl } from '@/lib/providers/fal/base-url'
 
 export interface TaskStatus {
     status: 'pending' | 'completed' | 'failed'
@@ -37,63 +36,6 @@ function getErrorStatus(error: unknown): number | undefined {
 interface GeminiBatchClient {
     batches: {
         get(args: { name: string }): Promise<unknown>
-    }
-}
-
-/**
- * 查询 FAL Banana 任务状态
- * @param requestId 任务ID
- * @param apiKey FAL API Key
- */
-export async function queryBananaTaskStatus(requestId: string, apiKey: string): Promise<TaskStatus> {
-    if (!apiKey) {
-        throw new Error('请配置 FAL API Key')
-    }
-
-    try {
-        const statusResponse = await fetch(
-            buildFalQueueUrl(`fal-ai/nano-banana-pro/requests/${requestId}/status`),
-            {
-                headers: { 'Authorization': `Key ${apiKey}` },
-                cache: 'no-store'
-            }
-        )
-
-        if (!statusResponse.ok) {
-            logInternal('Banana', 'ERROR', `Status query failed: ${statusResponse.status}`)
-            return { status: 'pending' }
-        }
-
-        const data = await statusResponse.json()
-
-        if (data.status === 'COMPLETED') {
-            // 获取结果
-            const resultResponse = await fetch(
-                buildFalQueueUrl(`fal-ai/nano-banana-pro/requests/${requestId}`),
-                {
-                    headers: { 'Authorization': `Key ${apiKey}` },
-                    cache: 'no-store'
-                }
-            )
-
-            if (resultResponse.ok) {
-                const result = await resultResponse.json()
-                const imageUrl = result.images?.[0]?.url
-
-                if (imageUrl) {
-                    return { status: 'completed', imageUrl }
-                }
-            }
-
-            return { status: 'failed', error: 'No image URL in result' }
-        } else if (data.status === 'FAILED') {
-            return { status: 'failed', error: data.error || 'Banana generation failed' }
-        }
-
-        return { status: 'pending' }
-    } catch (error: unknown) {
-        logInternal('Banana', 'ERROR', 'Query error', { error: getErrorMessage(error) })
-        return { status: 'pending' }
     }
 }
 

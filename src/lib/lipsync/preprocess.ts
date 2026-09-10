@@ -6,7 +6,7 @@ import type { LipSyncParams } from '@/lib/lipsync/types'
 
 const LIPSYNC_MIN_AUDIO_DURATION_MS = 2000
 
-export type LipSyncProviderKey = 'fal' | 'vidu' | 'bailian' | 'evolink'
+export type LipSyncProviderKey = 'vidu' | 'bailian'
 
 interface LoadedBinary {
   buffer: Buffer
