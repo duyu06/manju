@@ -6,13 +6,13 @@
     "subtitle": "创意、大纲、剧本、角色、分镜、画面、视频、配音统一协同，让 AI 内容生产从单点工具升级为标准化工作流。",
     "ctaLoggedIn": "进入制作中心",
     "ctaLoggedOut": "体验制作流程",
-    "noCreditCard": "项目经理面试演示版本"
+    "noCreditCard": "AI 产品经理面试演示版本"
   },
   "showcase": {
     "title": "AI 影视生产案例"
   },
-  "title": "YAOKE",
-  "subtitle": "AI 影视生产协同平台",
+  "title": "DramaFlow Studio",
+  "subtitle": "AI 短剧智能生产平台",
   "enterWorkspace": "进入项目工作台",
   "loading": "加载中...",
   "getStarted": "创建项目",
@@ -34,7 +34,7 @@
     }
   },
   "footer": {
-    "copyright": "2026 YAOKE · Demo",
+    "copyright": "2026 DramaFlow Studio · Demo",
     "poweredBy": "基于开源 AIDrama Studio 二次产品化验证"
   }
 }
