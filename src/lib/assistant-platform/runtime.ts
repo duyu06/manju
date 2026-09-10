@@ -13,6 +13,13 @@ import type {
   AssistantRuntimeContext,
 } from './types'
 
+const OFFICIAL_OPENAI_PROTOCOL_ENDPOINTS: Readonly<Record<string, string>> = {
+  openai: 'https://api.openai.com/v1',
+  ark: 'https://ark.cn-beijing.volces.com/api/v3',
+  bailian: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  minimax: 'https://api.minimaxi.com/v1',
+}
+
 function normalizeAssistantContext(raw: unknown): AssistantContext {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
   const record = raw as Record<string, unknown>
@@ -41,13 +48,12 @@ async function resolveAssistantLanguageModel(input: {
 }> {
   const selection = await resolveLlmRuntimeModel(input.userId, input.analysisModelKey)
   const providerConfig = await getProviderConfig(input.userId, selection.provider)
-  const providerKey = getProviderKey(selection.provider)
+  const providerKey = getProviderKey(selection.provider).toLowerCase()
 
-  if (providerKey === 'google' || providerKey === 'gemini-compatible') {
+  if (providerKey === 'google') {
     const google = createGoogleGenerativeAI({
       apiKey: providerConfig.apiKey,
-      ...(providerConfig.baseUrl ? { baseURL: providerConfig.baseUrl } : {}),
-      name: providerKey,
+      name: 'google',
     })
     return {
       resolvedModel: {
@@ -59,9 +65,17 @@ async function resolveAssistantLanguageModel(input: {
     }
   }
 
-  const openai = createOpenAI({
+  const baseURL = OFFICIAL_OPENAI_PROTOCOL_ENDPOINTS[providerKey]
+  if (!baseURL) {
+    throw new AssistantPlatformError(
+      'ASSISTANT_MODEL_NOT_CONFIGURED',
+      `unsupported official assistant provider: ${providerKey}`,
+    )
+  }
+
+  const officialProvider = createOpenAI({
     apiKey: providerConfig.apiKey,
-    ...(providerConfig.baseUrl ? { baseURL: providerConfig.baseUrl } : {}),
+    baseURL,
     name: providerKey,
   })
   return {
@@ -70,7 +84,7 @@ async function resolveAssistantLanguageModel(input: {
       providerKey,
       modelId: selection.modelId,
     },
-    languageModel: openai.chat(selection.modelId),
+    languageModel: officialProvider.chat(selection.modelId),
   }
 }
 
