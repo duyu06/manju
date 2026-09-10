@@ -24,6 +24,765 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Apply official-only source migration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def write(path: str, content: str) -> None:
+              p = Path(path)
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(content.rstrip() + "\n", encoding="utf-8")
+
+          def delete(path: str) -> None:
+              p = Path(path)
+              if p.exists():
+                  p.unlink()
+
+          # Remove compatibility/aggregator implementations and tests that only
+          # validate the deleted intermediary architecture.
+          for path in [
+              'src/lib/generators/image/gemini-compatible.ts',
+              'src/lib/generators/image/openai-compatible.ts',
+              'src/lib/generators/video/openai-compatible.ts',
+              'src/lib/lipsync/providers/evolink.ts',
+              'src/lib/lipsync/providers/fal.ts',
+              'src/lib/openai-compat-template-runtime.ts',
+              'src/lib/storage/providers/evolink.ts',
+              'src/lib/user-api/model-llm-protocol-probe.ts',
+              'src/lib/user-api/model-template/probe.ts',
+              'tests/integration/provider/openai-compat-provider.contract.test.ts',
+              'tests/regression/evolink-audio-api-alignment.test.ts',
+              'tests/regression/evolink-no-base64.test.ts',
+              'tests/unit/generator-api.test.ts',
+              'tests/unit/generators/evolink-image-params.test.ts',
+              'tests/unit/generators/evolink-video-params.test.ts',
+              'tests/unit/generators/fal-video-kling-presets.test.ts',
+              'tests/unit/model-gateway/openai-compat-responses.test.ts',
+              'tests/unit/model-gateway/openai-compat-template-image-output-urls.test.ts',
+              'tests/unit/model-gateway/openai-compat-template-video-external-id.test.ts',
+              'tests/unit/providers/evolink-audio.test.ts',
+              'tests/unit/providers/model-registry.test.ts',
+              'tests/unit/user-api/provider-test-compatible.test.ts',
+          ]:
+              delete(path)
+
+          # User model dropdown: only configured first-party providers survive.
+          write('src/app/api/user/models/route.ts', r'''
+          import { NextResponse } from 'next/server'
+          import { prisma } from '@/lib/prisma'
+          import { requireUserAuth, isErrorResponse } from '@/lib/api-auth'
+          import { apiHandler, ApiError } from '@/lib/api-errors'
+          import {
+            composeModelKey,
+            parseModelKeyStrict,
+            type CapabilityValue,
+            type ModelCapabilities,
+            type UnifiedModelType,
+          } from '@/lib/model-config-contract'
+          import { findBuiltinCapabilities } from '@/lib/model-capabilities/catalog'
+          import { findBuiltinPricingCatalogEntry } from '@/lib/model-pricing/catalog'
+          import type { VideoPricingTier } from '@/lib/model-pricing/video-tier'
+
+          type StoredModelType = UnifiedModelType | string
+
+          interface StoredModel {
+            modelId?: string
+            modelKey?: string
+            name?: string
+            type?: StoredModelType
+            provider?: string
+          }
+
+          interface StoredProvider {
+            id?: string
+            name?: string
+            apiKey?: string
+          }
+
+          interface UserModelOption {
+            value: string
+            label: string
+            provider?: string
+            providerName?: string
+            capabilities?: ModelCapabilities
+            videoPricingTiers?: VideoPricingTier[]
+          }
+
+          interface UserModelsPayload {
+            llm: UserModelOption[]
+            image: UserModelOption[]
+            video: UserModelOption[]
+            audio: UserModelOption[]
+            lipsync: UserModelOption[]
+          }
+
+          const OFFICIAL_PROVIDER_KEYS = new Set([
+            'openai',
+            'google',
+            'ark',
+            'bailian',
+            'minimax',
+            'vidu',
+            'imagen',
+          ])
+
+          const AUDIO_MODEL_EXCLUDED_IDS = new Set(['qwen-voice-design'])
+
+          function isUnifiedModelType(type: unknown): type is UnifiedModelType {
+            return type === 'llm' || type === 'image' || type === 'video' || type === 'audio' || type === 'lipsync'
+          }
+
+          function providerKey(providerId: string): string {
+            const index = providerId.indexOf(':')
+            return (index === -1 ? providerId : providerId.slice(0, index)).toLowerCase()
+          }
+
+          function isOfficialProvider(providerId: string): boolean {
+            return OFFICIAL_PROVIDER_KEYS.has(providerKey(providerId))
+          }
+
+          function toModelKey(model: StoredModel): string {
+            const provider = typeof model.provider === 'string' ? model.provider.trim() : ''
+            const modelId = typeof model.modelId === 'string' ? model.modelId.trim() : ''
+            if (provider && modelId) return composeModelKey(provider, modelId)
+            const parsed = parseModelKeyStrict(typeof model.modelKey === 'string' ? model.modelKey : '')
+            return parsed?.modelKey || ''
+          }
+
+          function toProvider(model: StoredModel): string | undefined {
+            if (typeof model.provider === 'string' && model.provider.trim()) return model.provider.trim()
+            return parseModelKeyStrict(typeof model.modelKey === 'string' ? model.modelKey : '')?.provider
+          }
+
+          function toModelId(model: StoredModel): string {
+            if (typeof model.modelId === 'string' && model.modelId.trim()) return model.modelId.trim()
+            return parseModelKeyStrict(typeof model.modelKey === 'string' ? model.modelKey : '')?.modelId || ''
+          }
+
+          function parseArray<T>(raw: string | null | undefined, code: string, field: string): T[] {
+            if (!raw) return []
+            let value: unknown
+            try { value = JSON.parse(raw) } catch {
+              throw new ApiError('INVALID_PARAMS', { code, field })
+            }
+            if (!Array.isArray(value)) throw new ApiError('INVALID_PARAMS', { code, field })
+            return value as T[]
+          }
+
+          function cloneVideoPricingTiers(raw: Array<{ when: Record<string, CapabilityValue> }>): VideoPricingTier[] {
+            return raw.map((tier) => ({ when: { ...tier.when } }))
+          }
+
+          function dedupe(items: UserModelOption[]): UserModelOption[] {
+            const seen = new Set<string>()
+            return items.filter((item) => {
+              if (seen.has(item.value)) return false
+              seen.add(item.value)
+              return true
+            })
+          }
+
+          export const GET = apiHandler(async () => {
+            const authResult = await requireUserAuth()
+            if (isErrorResponse(authResult)) return authResult
+            const userId = authResult.session.user.id
+
+            const pref = await prisma.userPreference.findUnique({
+              where: { userId },
+              select: { customModels: true, customProviders: true },
+            })
+
+            const models = parseArray<StoredModel>(pref?.customModels, 'MODEL_PAYLOAD_INVALID', 'customModels')
+            const providers = parseArray<StoredProvider>(pref?.customProviders, 'PROVIDER_PAYLOAD_INVALID', 'customProviders')
+
+            const providerNames = new Map<string, string>()
+            const configuredProviders = new Set<string>()
+            for (const provider of providers) {
+              const id = typeof provider.id === 'string' ? provider.id.trim() : ''
+              if (!id || !isOfficialProvider(id)) continue
+              if (typeof provider.name === 'string' && provider.name.trim()) providerNames.set(id, provider.name.trim())
+              if (typeof provider.apiKey === 'string' && provider.apiKey.trim()) configuredProviders.add(id)
+            }
+
+            const grouped: UserModelsPayload = { llm: [], image: [], video: [], audio: [], lipsync: [] }
+            for (const model of models) {
+              if (!isUnifiedModelType(model.type)) continue
+              const provider = toProvider(model)
+              if (!provider || !isOfficialProvider(provider) || !configuredProviders.has(provider)) continue
+              const modelId = toModelId(model)
+              if (!modelId) continue
+              if (model.type === 'audio' && AUDIO_MODEL_EXCLUDED_IDS.has(modelId)) continue
+              const modelKey = toModelKey(model)
+              if (!modelKey) continue
+
+              const option: UserModelOption = {
+                value: modelKey,
+                label: typeof model.name === 'string' && model.name.trim() ? model.name.trim() : modelId,
+                provider,
+                providerName: providerNames.get(provider),
+              }
+              const capabilities = findBuiltinCapabilities(model.type, provider, modelId)
+              if (capabilities) option.capabilities = capabilities
+              if (model.type === 'video') {
+                const pricingEntry = findBuiltinPricingCatalogEntry('video', provider, modelId)
+                if (pricingEntry?.pricing.mode === 'capability' && Array.isArray(pricingEntry.pricing.tiers)) {
+                  option.videoPricingTiers = cloneVideoPricingTiers(pricingEntry.pricing.tiers)
+                }
+              }
+              grouped[model.type].push(option)
+            }
+
+            return NextResponse.json({
+              llm: dedupe(grouped.llm),
+              image: dedupe(grouped.image),
+              video: dedupe(grouped.video),
+              audio: dedupe(grouped.audio),
+              lipsync: dedupe(grouped.lipsync),
+            } satisfies UserModelsPayload)
+          })
+          ''')
+
+          # Async task helper: Ark only.
+          write('src/lib/async-submit.ts', r'''
+          export async function queryArkVideoStatus(taskId: string, apiKey: string): Promise<{
+            status: string
+            completed: boolean
+            failed: boolean
+            resultUrl?: string
+            error?: string
+          }> {
+            if (!apiKey) throw new Error('请配置火山引擎 API Key')
+            const response = await fetch(
+              `https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/${taskId}`,
+              { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` } },
+            )
+            if (!response.ok) return { status: 'unknown', completed: false, failed: false }
+            const data = await response.json()
+            if (data.status === 'succeeded') {
+              return { status: 'succeeded', completed: true, failed: false, resultUrl: data.content?.video_url }
+            }
+            if (data.status === 'failed') {
+              const error = data.error || {}
+              let message = error.message || '任务失败'
+              if (error.code === 'OutputVideoSensitiveContentDetected') message = '视频生成失败：内容审核未通过'
+              if (error.code === 'InputImageSensitiveContentDetected') message = '视频生成失败：输入图片审核未通过'
+              return { status: 'failed', completed: false, failed: true, error: message }
+            }
+            return { status: data.status || 'unknown', completed: false, failed: false }
+          }
+
+          export type AsyncTaskProvider = 'ark'
+          export type AsyncTaskType = 'video' | 'image' | 'tts' | 'lipsync'
+
+          export async function queryAsyncTaskStatus(
+            provider: AsyncTaskProvider,
+            taskId: string,
+            apiKey: string,
+            _endpoint?: string,
+          ) {
+            if (provider !== 'ark') throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: ${provider}`)
+            return await queryArkVideoStatus(taskId, apiKey)
+          }
+          ''')
+
+          # Remove FAL status code while retaining Google/Ark official async helpers.
+          p = Path('src/lib/async-task-utils.ts')
+          if p.exists():
+              text = p.read_text(encoding='utf-8')
+              text = text.replace("import { buildFalQueueUrl } from '@/lib/providers/fal/base-url'\n", '')
+              text = re.sub(
+                  r"/\*\*\n \* 查询 FAL Banana 任务状态.*?(?=/\*\*\n \* 查询 Gemini Batch 任务状态)",
+                  '',
+                  text,
+                  flags=re.S,
+              )
+              p.write_text(text, encoding='utf-8')
+
+          write('src/lib/generators/image/index.ts', r'''
+          export { GoogleGeminiImageGenerator, GoogleImagenGenerator, GoogleGeminiBatchImageGenerator } from './google'
+          export { ArkSeedreamGenerator, ArkImageGenerator } from '../ark'
+          ''')
+
+          p = Path('src/lib/generators/image/google.ts')
+          if p.exists():
+              text = p.read_text(encoding='utf-8')
+              text = text.replace("import { setProxy } from '../../../../lib/prompts/proxy'\n", '')
+              text = text.replace('        await setProxy()\n', '')
+              p.write_text(text, encoding='utf-8')
+
+          write('src/lib/generators/video/index.ts', r'''
+          export { ArkSeedanceVideoGenerator, ArkVideoGenerator } from '../ark'
+          export { GoogleVeoVideoGenerator } from './google'
+          ''')
+
+          write('src/lib/generators/official.ts', r'''
+          import {
+            BaseAudioGenerator,
+            BaseImageGenerator,
+            BaseVideoGenerator,
+            type AudioGenerateParams,
+            type GenerateResult,
+            type ImageGenerateParams,
+            type VideoGenerateParams,
+          } from './base'
+          import { generateBailianAudio, generateBailianImage, generateBailianVideo } from '@/lib/providers/bailian'
+
+          export class BailianImageGenerator extends BaseImageGenerator {
+            protected async doGenerate(params: ImageGenerateParams): Promise<GenerateResult> {
+              return await generateBailianImage({
+                userId: params.userId,
+                prompt: params.prompt,
+                referenceImages: params.referenceImages,
+                options: {
+                  ...params.options,
+                  provider: 'bailian',
+                  modelId: typeof params.options?.modelId === 'string' ? params.options.modelId : '',
+                  modelKey: typeof params.options?.modelKey === 'string' ? params.options.modelKey : '',
+                },
+              })
+            }
+          }
+
+          export class BailianVideoGenerator extends BaseVideoGenerator {
+            protected async doGenerate(params: VideoGenerateParams): Promise<GenerateResult> {
+              return await generateBailianVideo({
+                userId: params.userId,
+                imageUrl: params.imageUrl,
+                prompt: params.prompt,
+                options: {
+                  ...params.options,
+                  provider: 'bailian',
+                  modelId: typeof params.options?.modelId === 'string' ? params.options.modelId : '',
+                  modelKey: typeof params.options?.modelKey === 'string' ? params.options.modelKey : '',
+                },
+              })
+            }
+          }
+
+          export class BailianAudioGenerator extends BaseAudioGenerator {
+            protected async doGenerate(params: AudioGenerateParams): Promise<GenerateResult> {
+              return await generateBailianAudio({
+                userId: params.userId,
+                text: params.text,
+                voice: params.voice,
+                rate: params.rate,
+                options: {
+                  ...params.options,
+                  provider: 'bailian',
+                  modelId: typeof params.options?.modelId === 'string' ? params.options.modelId : '',
+                  modelKey: typeof params.options?.modelKey === 'string' ? params.options.modelKey : '',
+                },
+              })
+            }
+          }
+          ''')
+
+          # Voice bindings are official Bailian only. Historical FAL/EvoLink rows
+          # fail closed instead of being silently rerouted.
+          write('src/lib/voice/provider-voice-binding.ts', r'''
+          type VoiceSource = 'character' | 'speaker'
+          export type SupportedAudioProviderKey = 'bailian'
+
+          export interface CharacterVoiceFields {
+            customVoiceUrl?: string | null
+            voiceId?: string | null
+          }
+
+          export type BailianSpeakerVoiceEntry = {
+            provider: 'bailian'
+            voiceType: string
+            voiceId: string
+            previewAudioUrl?: string
+          }
+
+          export type SpeakerVoiceEntry = BailianSpeakerVoiceEntry
+          export type SpeakerVoiceMap = Record<string, SpeakerVoiceEntry>
+          export type VoiceGenerationBinding = {
+            provider: 'bailian'
+            source: VoiceSource
+            voiceId: string
+          }
+          export type SpeakerVoicePatch = {
+            provider: 'bailian'
+            voiceType?: string
+            voiceId: string
+            previewAudioUrl?: string
+          }
+
+          function readTrimmedString(input: unknown): string | null {
+            if (typeof input !== 'string') return null
+            const value = input.trim()
+            return value ? value : null
+          }
+
+          export function parseSpeakerVoiceMap(raw: string | null | undefined): SpeakerVoiceMap {
+            if (!raw) return {}
+            let parsed: unknown
+            try { parsed = JSON.parse(raw) } catch { throw new Error('SPEAKER_VOICES_INVALID_JSON') }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('SPEAKER_VOICES_INVALID_SHAPE')
+            const result: SpeakerVoiceMap = {}
+            for (const [speaker, value] of Object.entries(parsed as Record<string, unknown>)) {
+              if (!speaker.trim() || !value || typeof value !== 'object' || Array.isArray(value)) {
+                throw new Error(`SPEAKER_VOICE_ENTRY_INVALID: ${speaker}`)
+              }
+              const entry = value as Record<string, unknown>
+              const provider = readTrimmedString(entry.provider)?.toLowerCase()
+              if (provider && provider !== 'bailian') throw new Error(`SPEAKER_VOICE_ENTRY_INVALID_PROVIDER: ${speaker}`)
+              const voiceId = readTrimmedString(entry.voiceId)
+              if (!voiceId) throw new Error(`SPEAKER_VOICE_ENTRY_INVALID_BAILIAN_VOICE_ID: ${speaker}`)
+              const preview = readTrimmedString(entry.previewAudioUrl) || readTrimmedString(entry.audioUrl)
+              result[speaker] = {
+                provider: 'bailian',
+                voiceType: readTrimmedString(entry.voiceType) || 'designed',
+                voiceId,
+                ...(preview ? { previewAudioUrl: preview } : {}),
+              }
+            }
+            return result
+          }
+
+          export function resolveVoiceBindingForProvider(params: {
+            providerKey: string
+            character?: CharacterVoiceFields | null
+            speakerVoice?: SpeakerVoiceEntry | null
+          }): VoiceGenerationBinding | null {
+            if (params.providerKey.toLowerCase() !== 'bailian') return null
+            const characterVoiceId = readTrimmedString(params.character?.voiceId)
+            if (characterVoiceId) return { provider: 'bailian', source: 'character', voiceId: characterVoiceId }
+            const speakerVoiceId = readTrimmedString(params.speakerVoice?.voiceId)
+            return speakerVoiceId ? { provider: 'bailian', source: 'speaker', voiceId: speakerVoiceId } : null
+          }
+
+          export function hasVoiceBindingForProvider(params: {
+            providerKey: string
+            character?: CharacterVoiceFields | null
+            speakerVoice?: SpeakerVoiceEntry | null
+          }): boolean {
+            return !!resolveVoiceBindingForProvider(params)
+          }
+
+          export function hasAnyVoiceBinding(params: {
+            character?: CharacterVoiceFields | null
+            speakerVoice?: SpeakerVoiceEntry | null
+          }): boolean {
+            return !!readTrimmedString(params.character?.voiceId) || !!readTrimmedString(params.speakerVoice?.voiceId)
+          }
+
+          export function getSpeakerVoicePreviewUrl(speakerVoice?: SpeakerVoiceEntry | null): string | null {
+            return readTrimmedString(speakerVoice?.previewAudioUrl)
+          }
+          ''')
+
+          p = Path('src/lib/voice/generate-voice-line.ts')
+          if p.exists():
+              text = p.read_text(encoding='utf-8')
+              text = text.replace("import { fal } from '@fal-ai/client'\n", '')
+              text = text.replace("import { getAudioApiKey, getProviderConfig, getProviderKey, resolveModelSelectionOrSingle } from '@/lib/api-config'", "import { getProviderConfig, getProviderKey, resolveModelSelectionOrSingle } from '@/lib/api-config'")
+              text = text.replace("import { normalizeToBase64ForGeneration } from '@/lib/media/outbound-image'\n", '')
+              text = text.replace("import { extractStorageKey, getSignedUrl, toFetchableUrl, uploadObject } from '@/lib/storage'", "import { getSignedUrl, uploadObject } from '@/lib/storage'")
+              text = text.replace("import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'\n", '')
+              text = text.replace("import { synthesizeWithEvolinkTTS } from '@/lib/providers/evolink'\n", '')
+              text = re.sub(r"async function generateVoiceWithIndexTTS2\(.*?(?=function matchCharacterBySpeaker)", '', text, flags=re.S)
+              text = re.sub(r"async function resolveReferenceAudioUrl\(.*?(?=export async function generateVoiceLine)", '', text, flags=re.S)
+              replacement = r'''let generated: { audioData: Buffer; audioDuration: number }
+          if (providerKey !== 'bailian') {
+            throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: audio provider ${audioSelection.provider}`)
+          }
+          if (!voiceBinding || voiceBinding.provider !== 'bailian') {
+            throw new Error('Please bind a Bailian voice to this speaker first.')
+          }
+          const { apiKey } = await getProviderConfig(params.userId, audioSelection.provider)
+          const result = await synthesizeWithBailianTTS({
+            text,
+            voiceId: voiceBinding.voiceId,
+            modelId: audioSelection.modelId,
+            languageType: 'Chinese',
+          }, apiKey)
+          if (!result.success || !result.audioData) {
+            throw new Error(normalizeBailianVoiceGenerationError(result.error))
+          }
+          generated = {
+            audioData: result.audioData,
+            audioDuration: result.audioDuration ?? getWavDurationFromBuffer(result.audioData),
+          }
+
+          '''
+              text = re.sub(r"let generated: \{ audioData: Buffer; audioDuration: number \}.*?(?=  const audioKey =)", replacement, text, flags=re.S)
+              p.write_text(text, encoding='utf-8')
+
+          write('src/lib/workers/handlers/voice-design.ts', r'''
+          import type { Job } from 'bullmq'
+          import {
+            createVoiceDesign,
+            validatePreviewText,
+            validateVoicePrompt,
+            type VoiceDesignInput,
+          } from '@/lib/providers/bailian/voice-design'
+          import { getProviderConfig } from '@/lib/api-config'
+          import { reportTaskProgress } from '@/lib/workers/shared'
+          import { assertTaskActive } from '@/lib/workers/utils'
+          import { TASK_TYPE, type TaskJobData } from '@/lib/task/types'
+
+          function required(value: unknown, field: string): string {
+            if (typeof value !== 'string' || !value.trim()) throw new Error(`${field} is required`)
+            return value.trim()
+          }
+
+          export async function handleVoiceDesignTask(job: Job<TaskJobData>) {
+            const payload = (job.data.payload || {}) as Record<string, unknown>
+            const explicitProvider = typeof payload.provider === 'string' ? payload.provider.trim().toLowerCase() : 'bailian'
+            if (explicitProvider !== 'bailian') throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: ${explicitProvider}`)
+            const voicePrompt = required(payload.voicePrompt, 'voicePrompt')
+            const previewText = required(payload.previewText, 'previewText')
+            const preferredName = typeof payload.preferredName === 'string' && payload.preferredName.trim() ? payload.preferredName.trim() : 'custom_voice'
+            const language: 'zh' | 'en' = typeof payload.language === 'string' && payload.language.trim().toLowerCase() === 'en' ? 'en' : 'zh'
+
+            const promptValidation = validateVoicePrompt(voicePrompt)
+            if (!promptValidation.valid) throw new Error(promptValidation.error || 'invalid voicePrompt')
+            const textValidation = validatePreviewText(previewText)
+            if (!textValidation.valid) throw new Error(textValidation.error || 'invalid previewText')
+
+            await reportTaskProgress(job, 25, { stage: 'voice_design_submit', stageLabel: '提交声音设计任务', displayMode: 'detail' })
+            await assertTaskActive(job, 'voice_design_submit')
+            const { apiKey } = await getProviderConfig(job.data.userId, 'bailian')
+            const input: VoiceDesignInput = { voicePrompt, previewText, preferredName, language }
+            const designed = await createVoiceDesign(input, apiKey)
+            if (!designed.success) throw new Error(designed.error || '声音设计失败')
+
+            await reportTaskProgress(job, 96, { stage: 'voice_design_done', stageLabel: '声音设计完成', displayMode: 'detail' })
+            return {
+              success: true,
+              voiceId: designed.voiceId,
+              targetModel: designed.targetModel,
+              audioBase64: designed.audioBase64,
+              sampleRate: designed.sampleRate,
+              responseFormat: designed.responseFormat,
+              usageCount: designed.usageCount,
+              requestId: designed.requestId,
+              taskType: job.data.type === TASK_TYPE.ASSET_HUB_VOICE_DESIGN ? TASK_TYPE.ASSET_HUB_VOICE_DESIGN : TASK_TYPE.VOICE_DESIGN,
+            }
+          }
+          ''')
+
+          write('src/lib/lipsync/index.ts', r'''
+          import { logError as _ulogError, logInfo as _ulogInfo } from '@/lib/logging/core'
+          import { getProviderKey, resolveModelSelectionOrSingle } from '@/lib/api-config'
+          import { preprocessLipSyncParams, type LipSyncProviderKey } from '@/lib/lipsync/preprocess'
+          import { submitBailianLipSync } from '@/lib/lipsync/providers/bailian'
+          import { submitViduLipSync } from '@/lib/lipsync/providers/vidu'
+          import type { LipSyncParams, LipSyncResult, LipSyncSubmitContext } from '@/lib/lipsync/types'
+
+          function context(userId: string, selection: { provider: string; modelId: string; modelKey: string }): LipSyncSubmitContext {
+            return { userId, providerId: selection.provider, modelId: selection.modelId, modelKey: selection.modelKey }
+          }
+
+          function resolveProviderKey(value: string): LipSyncProviderKey {
+            const key = value.toLowerCase()
+            if (key === 'vidu' || key === 'bailian') return key
+            throw new Error(`LIPSYNC_PROVIDER_UNSUPPORTED: ${value}`)
+          }
+
+          export async function generateLipSync(params: LipSyncParams, userId: string, modelKey?: string): Promise<LipSyncResult> {
+            _ulogInfo('[LipSync Async] 开始提交官方口型同步任务')
+            try {
+              const selection = await resolveModelSelectionOrSingle(userId, modelKey, 'lipsync')
+              const providerKey = resolveProviderKey(getProviderKey(selection.provider))
+              const { params: normalized } = await preprocessLipSyncParams(params, { providerKey })
+              if (providerKey === 'vidu') return await submitViduLipSync(normalized, context(userId, selection))
+              if (providerKey === 'bailian') return await submitBailianLipSync(normalized, context(userId, selection))
+              throw new Error(`LIPSYNC_PROVIDER_UNSUPPORTED: ${selection.provider}`)
+            } catch (error: unknown) {
+              _ulogError('[LipSync Async] 错误:', error)
+              const message = error instanceof Error ? error.message : String(error)
+              throw new Error(`口型同步任务提交失败: ${message}`)
+            }
+          }
+
+          export type { LipSyncParams, LipSyncResult } from '@/lib/lipsync/types'
+          ''')
+
+          p = Path('src/lib/lipsync/preprocess.ts')
+          if p.exists():
+              text = p.read_text(encoding='utf-8').replace("export type LipSyncProviderKey = 'fal' | 'vidu' | 'bailian' | 'evolink'", "export type LipSyncProviderKey = 'vidu' | 'bailian'")
+              p.write_text(text, encoding='utf-8')
+
+          # Stream callbacks remain available, but provider streaming now delegates
+          # to the same official-only non-stream runtime to remove compatibility paths.
+          write('src/lib/llm/chat-stream.ts', r'''
+          import type OpenAI from 'openai'
+          import type { ChatCompletionOptions, ChatCompletionStreamCallbacks } from './types'
+          import { getCompletionParts } from './completion-parts'
+          import { emitStreamChunk, emitStreamStage, resolveStreamStepMeta } from './stream-helpers'
+
+          export async function chatCompletionStream(
+            userId: string,
+            model: string | null | undefined,
+            messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
+            options: ChatCompletionOptions = {},
+            callbacks?: ChatCompletionStreamCallbacks,
+          ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+            const step = resolveStreamStepMeta(options)
+            emitStreamStage(callbacks, step, 'submit')
+            try {
+              const { chatCompletion } = await import('./chat-completion')
+              emitStreamStage(callbacks, step, 'streaming', 'official')
+              const completion = await chatCompletion(userId, model, messages, { ...options, __skipAutoStream: true })
+              const parts = getCompletionParts(completion)
+              let seq = 1
+              if (parts.reasoning) {
+                emitStreamChunk(callbacks, step, { kind: 'reasoning', delta: parts.reasoning, seq, lane: 'reasoning' })
+                seq += 1
+              }
+              if (parts.text) {
+                emitStreamChunk(callbacks, step, { kind: 'text', delta: parts.text, seq, lane: 'main' })
+              }
+              emitStreamStage(callbacks, step, 'completed', 'official')
+              callbacks?.onComplete?.(parts.text, step)
+              return completion
+            } catch (error) {
+              callbacks?.onError?.(error, step)
+              throw error
+            }
+          }
+          ''')
+
+          # Vision supports only first-party Google, Ark, and OpenAI endpoints.
+          write('src/lib/llm/vision.ts', r'''
+          import OpenAI from 'openai'
+          import { GoogleGenAI } from '@google/genai'
+          import { getProviderConfig, getProviderKey } from '../api-config'
+          import { getInternalLLMStreamCallbacks } from '../llm-observe/internal-stream-context'
+          import type { ChatCompletionOptions, ChatCompletionStreamCallbacks } from './types'
+          import { arkResponsesCompletion } from './providers/ark'
+          import { extractGoogleText, extractGoogleUsage } from './providers/google'
+          import { buildOpenAIChatCompletion } from './providers/openai-compat'
+          import { emitChunkedText } from './stream-helpers'
+          import { getCompletionParts } from './completion-parts'
+          import { isRetryableError, recordCompletionUsage, resolveLlmRuntimeModel } from './runtime-shared'
+
+          type GooglePart = { inlineData: { mimeType: string; data: string } } | { text: string }
+          type ArkPart = { type: 'input_image'; image_url: string } | { type: 'input_text'; text: string }
+          type OpenAIPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+
+          async function toDataUrl(url: string): Promise<string> {
+            if (url.startsWith('data:')) return url
+            const { normalizeToBase64ForGeneration } = await import('@/lib/media/outbound-image')
+            return await normalizeToBase64ForGeneration(url)
+          }
+
+          export async function chatCompletionWithVision(
+            userId: string,
+            model: string | null | undefined,
+            textPrompt: string,
+            imageUrls: string[] = [],
+            options: ChatCompletionOptions = {},
+          ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+            const internalCallbacks = getInternalLLMStreamCallbacks()
+            if (internalCallbacks && !options.__skipAutoStream) {
+              return await chatCompletionWithVisionStream(userId, model, textPrompt, imageUrls, { ...options, __skipAutoStream: true }, internalCallbacks)
+            }
+            if (!model) throw new Error('ANALYSIS_MODEL_NOT_CONFIGURED: 请先在设置页面配置分析模型')
+
+            const selection = await resolveLlmRuntimeModel(userId, model)
+            const provider = selection.provider
+            const providerKey = getProviderKey(provider).toLowerCase()
+            if (!['google', 'ark', 'openai'].includes(providerKey)) {
+              throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: vision provider ${provider}`)
+            }
+            const config = await getProviderConfig(userId, provider)
+            const temperature = options.temperature ?? 0.7
+            const maxRetries = options.maxRetries ?? 2
+            let lastError: Error | null = null
+
+            for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+              try {
+                if (providerKey === 'google') {
+                  const ai = new GoogleGenAI({ apiKey: config.apiKey })
+                  const parts: GooglePart[] = []
+                  for (const url of imageUrls) {
+                    const dataUrl = await toDataUrl(url)
+                    const marker = dataUrl.indexOf(';base64,')
+                    if (marker !== -1) parts.push({ inlineData: { mimeType: dataUrl.substring(5, marker), data: dataUrl.substring(marker + 8) } })
+                  }
+                  if (textPrompt) parts.push({ text: textPrompt })
+                  const response = await ai.models.generateContent({ model: selection.modelId, contents: [{ role: 'user', parts }], config: { temperature } })
+                  const completion = buildOpenAIChatCompletion(selection.modelId, extractGoogleText(response), extractGoogleUsage(response))
+                  recordCompletionUsage(selection.modelId, completion)
+                  return completion
+                }
+
+                if (providerKey === 'ark') {
+                  const content: ArkPart[] = []
+                  for (const url of imageUrls) content.push({ type: 'input_image', image_url: url.startsWith('http') || url.startsWith('data:') ? url : await toDataUrl(url) })
+                  if (textPrompt) content.push({ type: 'input_text', text: textPrompt })
+                  const result = await arkResponsesCompletion({
+                    apiKey: config.apiKey,
+                    model: selection.modelId,
+                    input: [{ role: 'user', content }],
+                    thinking: { type: (options.reasoning ?? true) ? 'enabled' : 'disabled' },
+                  })
+                  const completion = buildOpenAIChatCompletion(selection.modelId, result.text, result.usage)
+                  recordCompletionUsage(selection.modelId, completion)
+                  return completion
+                }
+
+                const client = new OpenAI({ apiKey: config.apiKey, baseURL: 'https://api.openai.com/v1' })
+                const content: OpenAIPart[] = []
+                if (textPrompt) content.push({ type: 'text', text: textPrompt })
+                for (const url of imageUrls) content.push({ type: 'image_url', image_url: { url: url.startsWith('http') || url.startsWith('data:') ? url : await toDataUrl(url) } })
+                const completion = await client.chat.completions.create({
+                  model: selection.modelId,
+                  messages: [{ role: 'user', content }],
+                  temperature,
+                })
+                recordCompletionUsage(selection.modelId, completion)
+                return completion
+              } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error))
+                if (!isRetryableError(error) || attempt > maxRetries) break
+                await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * 2 ** (attempt - 1), 5000)))
+              }
+            }
+            throw lastError || new Error('LLM Vision 调用失败')
+          }
+
+          export async function chatCompletionWithVisionStream(
+            userId: string,
+            model: string | null | undefined,
+            textPrompt: string,
+            imageUrls: string[] = [],
+            options: ChatCompletionOptions = {},
+            callbacks?: ChatCompletionStreamCallbacks,
+          ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+            callbacks?.onStage?.({ stage: 'submit' })
+            try {
+              const completion = await chatCompletionWithVision(userId, model, textPrompt, imageUrls, { ...options, __skipAutoStream: true })
+              const parts = getCompletionParts(completion)
+              let seq = 1
+              if (parts.reasoning) seq = emitChunkedText(parts.reasoning, callbacks, 'reasoning', seq)
+              emitChunkedText(parts.text, callbacks, 'text', seq)
+              callbacks?.onStage?.({ stage: 'completed' })
+              callbacks?.onComplete?.(parts.text)
+              return completion
+            } catch (error) {
+              callbacks?.onError?.(error, undefined)
+              throw error
+            }
+          }
+          ''')
+          PY
+
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "refactor: remove remaining intermediary provider references"
+            git push origin HEAD:cleanup/official-api-only
+          fi
+
       - name: Synchronize package lock
         run: npm install --package-lock-only --ignore-scripts
 
