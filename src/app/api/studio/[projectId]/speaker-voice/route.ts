@@ -1,66 +1,34 @@
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSignedUrl } from '@/lib/storage'
 import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
 import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'
-import {
-  parseSpeakerVoiceMap,
-  type SpeakerVoiceEntry,
-  type SpeakerVoiceMap,
-} from '@/lib/voice/provider-voice-binding'
+import { parseSpeakerVoiceMap, type SpeakerVoiceEntry, type SpeakerVoiceMap } from '@/lib/voice/provider-voice-binding'
 
 function readTrimmedString(input: unknown): string | null {
   if (typeof input !== 'string') return null
   const value = input.trim()
-  return value.length > 0 ? value : null
+  return value ? value : null
 }
 
 function signUrlIfNeeded(url: string): string {
-  if (url.startsWith('http')) return url
-  return getSignedUrl(url, 7200)
+  return url.startsWith('http') ? url : getSignedUrl(url, 7200)
 }
 
-/**
- * GET /api/studio/[projectId]/speaker-voice?episodeId=xxx
- * 获取剧集的发言人音色配置
- */
-export const GET = apiHandler(async (
-  request: NextRequest,
-  context: { params: Promise<{ projectId: string }> }
-) => {
+export const GET = apiHandler(async (request: NextRequest, context: { params: Promise<{ projectId: string }> }) => {
   const { projectId } = await context.params
-  const { searchParams } = new URL(request.url)
-  const episodeId = searchParams.get('episodeId')
-
+  const episodeId = new URL(request.url).searchParams.get('episodeId')
   const authResult = await requireProjectAuthLight(projectId)
   if (isErrorResponse(authResult)) return authResult
+  if (!episodeId) throw new ApiError('INVALID_PARAMS')
 
-  if (!episodeId) {
-    throw new ApiError('INVALID_PARAMS')
-  }
-
-  const episode = await prisma.studioEpisode.findUnique({
-    where: { id: episodeId },
-  })
-
-  if (!episode) {
-    throw new ApiError('NOT_FOUND')
-  }
-
-  const storedSpeakerVoices = parseSpeakerVoiceMap(episode.speakerVoices)
+  const episode = await prisma.studioEpisode.findUnique({ where: { id: episodeId } })
+  if (!episode) throw new ApiError('NOT_FOUND')
+  const stored = parseSpeakerVoiceMap(episode.speakerVoices)
   const speakerVoices: SpeakerVoiceMap = {}
-
-  for (const [speaker, voice] of Object.entries(storedSpeakerVoices)) {
-    if (voice.provider === 'fal') {
-      speakerVoices[speaker] = {
-        provider: 'fal',
-        voiceType: voice.voiceType,
-        audioUrl: signUrlIfNeeded(voice.audioUrl),
-      }
-      continue
-    }
-
+  for (const [speaker, voice] of Object.entries(stored)) {
     const previewAudioUrl = voice.previewAudioUrl ? signUrlIfNeeded(voice.previewAudioUrl) : undefined
     speakerVoices[speaker] = {
       provider: 'bailian',
@@ -69,101 +37,37 @@ export const GET = apiHandler(async (
       ...(previewAudioUrl ? { previewAudioUrl } : {}),
     }
   }
-
   return NextResponse.json({ speakerVoices })
 })
 
-/**
- * PATCH /api/studio/[projectId]/speaker-voice
- * 为指定发言人直接设置音色（写入 episode.speakerVoices JSON）
- * 用于不在资产库中的角色在配音阶段内联绑定音色
- */
-export const PATCH = apiHandler(async (
-  request: NextRequest,
-  context: { params: Promise<{ projectId: string }> }
-) => {
+export const PATCH = apiHandler(async (request: NextRequest, context: { params: Promise<{ projectId: string }> }) => {
   const { projectId } = await context.params
-
   const authResult = await requireProjectAuthLight(projectId)
   if (isErrorResponse(authResult)) return authResult
 
   const body = await request.json().catch(() => null)
   const episodeId = readTrimmedString(body?.episodeId) ?? ''
   const speaker = readTrimmedString(body?.speaker) ?? ''
-  const voiceType = readTrimmedString(body?.voiceType) ?? 'uploaded'
-  const providerRaw = readTrimmedString(body?.provider)?.toLowerCase() ?? null
-  if (!providerRaw || (providerRaw !== 'fal' && providerRaw !== 'bailian')) {
-    throw new ApiError('INVALID_PARAMS')
-  }
-  const provider = providerRaw
-  const audioUrl = readTrimmedString(body?.audioUrl)
-  const previewAudioUrl = readTrimmedString(body?.previewAudioUrl)
+  const voiceType = readTrimmedString(body?.voiceType) ?? 'designed'
+  const provider = readTrimmedString(body?.provider)?.toLowerCase() ?? ''
   const voiceId = readTrimmedString(body?.voiceId)
+  const previewAudioUrl = readTrimmedString(body?.previewAudioUrl)
+  if (!episodeId || !speaker || provider !== 'bailian' || !voiceId) throw new ApiError('INVALID_PARAMS')
 
-  if (!episodeId) {
-    throw new ApiError('INVALID_PARAMS')
-  }
-  if (!speaker) {
-    throw new ApiError('INVALID_PARAMS')
-  }
-  if (provider === 'fal' && !audioUrl) {
-    throw new ApiError('INVALID_PARAMS')
-  }
-  if (provider === 'bailian' && !voiceId) {
-    throw new ApiError('INVALID_PARAMS')
-  }
-
-  const projectData = await prisma.studioProject.findUnique({
-    where: { projectId },
-    select: { id: true },
-  })
-  if (!projectData) {
-    throw new ApiError('NOT_FOUND')
-  }
-
-  const episode = await prisma.studioEpisode.findFirst({
-    where: { id: episodeId, studioProjectId: projectData.id },
-    select: { id: true, speakerVoices: true },
-  })
-  if (!episode) {
-    throw new ApiError('NOT_FOUND')
-  }
+  const project = await prisma.studioProject.findUnique({ where: { projectId }, select: { id: true } })
+  if (!project) throw new ApiError('NOT_FOUND')
+  const episode = await prisma.studioEpisode.findFirst({ where: { id: episodeId, studioProjectId: project.id }, select: { id: true, speakerVoices: true } })
+  if (!episode) throw new ApiError('NOT_FOUND')
 
   const speakerVoices = parseSpeakerVoiceMap(episode.speakerVoices)
-
-  let nextVoiceEntry: SpeakerVoiceEntry
-  if (provider === 'fal') {
-    const sourceAudioUrl = audioUrl!
-    const resolvedStorageKey = await resolveStorageKeyFromMediaValue(sourceAudioUrl)
-    const audioUrlToStore = resolvedStorageKey || sourceAudioUrl
-    nextVoiceEntry = {
-      provider: 'fal',
-      voiceType,
-      audioUrl: audioUrlToStore,
-    }
-  } else {
-    const previewCandidate = previewAudioUrl || audioUrl
-    const resolvedPreviewKey = previewCandidate
-      ? await resolveStorageKeyFromMediaValue(previewCandidate)
-      : null
-    const previewAudioUrlToStore = previewCandidate
-      ? (resolvedPreviewKey || previewCandidate)
-      : undefined
-
-    nextVoiceEntry = {
-      provider: 'bailian',
-      voiceType,
-      voiceId: voiceId!,
-      ...(previewAudioUrlToStore ? { previewAudioUrl: previewAudioUrlToStore } : {}),
-    }
+  const resolvedPreviewKey = previewAudioUrl ? await resolveStorageKeyFromMediaValue(previewAudioUrl) : null
+  const nextVoiceEntry: SpeakerVoiceEntry = {
+    provider: 'bailian',
+    voiceType,
+    voiceId,
+    ...(previewAudioUrl ? { previewAudioUrl: resolvedPreviewKey || previewAudioUrl } : {}),
   }
-
   speakerVoices[speaker] = nextVoiceEntry
-
-  await prisma.studioEpisode.update({
-    where: { id: episodeId },
-    data: { speakerVoices: JSON.stringify(speakerVoices) },
-  })
-
+  await prisma.studioEpisode.update({ where: { id: episodeId }, data: { speakerVoices: JSON.stringify(speakerVoices) } })
   return NextResponse.json({ success: true })
 })

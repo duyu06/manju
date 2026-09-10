@@ -55,25 +55,13 @@ function validateSpeakerVoiceForProvider(
   }
 
   if (providerKey === 'bailian') {
-    const hasUploadedReference =
-      !!character?.customVoiceUrl ||
-      (speakerVoice?.provider === 'fal' && !!speakerVoice.audioUrl)
-    if (hasUploadedReference) {
-      return {
-        ok: false,
-        message: '无音色ID，QwenTTS 必须使用 AI 设计音色',
-      }
+    if (character?.customVoiceUrl) {
+      return { ok: false, message: '当前仅支持百炼官方 Voice ID；请先使用 AI 音色设计创建音色。' }
     }
-    return {
-      ok: false,
-      message: '请先为该发言人绑定百炼音色',
-    }
+    return { ok: false, message: '请先为该发言人绑定百炼音色' }
   }
 
-  return {
-    ok: false,
-    message: '请先为该发言人设置参考音频',
-  }
+  return { ok: false, message: `不支持的官方音频提供商: ${providerKey}` }
 }
 
 function hasSpeakerVoiceForProvider(

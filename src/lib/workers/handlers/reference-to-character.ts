@@ -2,9 +2,8 @@ import sharp from 'sharp'
 import type { Job } from 'bullmq'
 import { prisma } from '@/lib/prisma'
 import { generateImage } from '@/lib/generator-api'
-import { queryFalStatus } from '@/lib/async-submit'
+import { pollAsyncTask } from '@/lib/async-poll'
 import { fetchWithTimeoutAndRetry } from '@/lib/ark-api'
-import { getProviderConfig } from '@/lib/api-config'
 import { executeAiVisionStep } from '@/lib/ai-runtime'
 import { getUserModelConfig } from '@/lib/config-service'
 import {
@@ -34,7 +33,6 @@ async function generateLabeledImage(params: {
   imageModel: string
   prompt: string
   referenceImages?: string[]
-  falApiKey?: string | null
   keyPrefix: string
   labelText: string
 }): Promise<string | null> {
@@ -45,7 +43,6 @@ async function generateLabeledImage(params: {
     imageModel,
     prompt,
     referenceImages,
-    falApiKey,
     keyPrefix,
     labelText,
   } = params
@@ -63,23 +60,15 @@ async function generateLabeledImage(params: {
     )
 
     let finalImageUrl = result.imageUrl
-    const requestId = typeof result.requestId === 'string' ? result.requestId : ''
-    const endpoint = typeof result.endpoint === 'string' ? result.endpoint : ''
-    if (result.async && requestId && endpoint) {
-      if (!falApiKey) {
-        throw new Error('reference_to_character async result requires falApiKey')
-      }
+    const externalId = typeof result.externalId === 'string' ? result.externalId.trim() : ''
+    if (result.async) {
+      if (!externalId) throw new Error('OFFICIAL_ASYNC_EXTERNAL_ID_REQUIRED')
       for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt += 1) {
         await assertTaskActive(job, `reference_to_character_poll_${imageIndex + 1}_${attempt + 1}`)
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
-        const status = await queryFalStatus(endpoint, requestId, falApiKey)
-        if (status.completed && status.resultUrl) {
-          finalImageUrl = status.resultUrl
-          break
-        }
-        if (status.failed) {
-          return null
-        }
+        const status = await pollAsyncTask(externalId, userId)
+        if (status.status === 'completed' && status.resultUrl) { finalImageUrl = status.resultUrl; break }
+        if (status.status === 'failed') return null
       }
     }
 
@@ -203,7 +192,6 @@ export async function handleReferenceToCharacterTask(job: Job<TaskJobData>) {
   }
 
   const useReferenceImages = !customDescription
-  const { apiKey: falApiKey } = await getProviderConfig(job.data.userId, 'fal')
   const keyPrefix = isAssetHub ? 'ref-char' : `proj-ref-char-${job.data.projectId}`
   const count = normalizeImageGenerationCount('reference-to-character', payload.count)
 
@@ -221,8 +209,7 @@ export async function handleReferenceToCharacterTask(job: Job<TaskJobData>) {
       imageModel,
       prompt,
       referenceImages: useReferenceImages ? allReferenceImages : undefined,
-      falApiKey,
-      keyPrefix,
+        keyPrefix,
       labelText: characterName,
     }),
   ))
