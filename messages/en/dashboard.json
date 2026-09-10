@@ -6,7 +6,7 @@
     "name": "AI Short Drama: 24 Hours Later",
     "synopsis": "An unemployed programmer obtains an AI assistant that can predict the next 24 hours — but every prediction costs him a random piece of his past memory.",
     "statusLabel": "Status",
-    "status": "Video Generation",
+    "status": "Image Generation / Review",
     "etaLabel": "Target Delivery",
     "eta": "09/12",
     "sprintLabel": "Sprint",
@@ -16,11 +16,11 @@
     "title": "Project Overview",
     "progress": "Overall Progress",
     "stage": "Current Stage",
-    "stageValue": "Video Generation",
+    "stageValue": "Image Generation & Review",
     "blockers": "Blockers",
     "risks": "Risks",
-    "successRate": "AI Generation Success Rate",
-    "budgetUsage": "AI Budget Consumption"
+    "successRate": "Current Image Completion",
+    "budgetUsage": "AI Budget Consumption (Mock)"
   },
   "pipeline": {
     "title": "Production Pipeline",
@@ -52,7 +52,7 @@
     "items": [
       {
         "id": "R-01",
-        "issue": "Character consistency gaps in some lead shots",
+        "issue": "Lead-character consistency requires human review in several shots",
         "severity": "P1",
         "owner": "AI Generation",
         "statusKey": "in_progress",
@@ -60,7 +60,7 @@
       },
       {
         "id": "R-02",
-        "issue": "Video provider latency at peak hours",
+        "issue": "Provider latency at peak hours",
         "severity": "P1",
         "owner": "Backend",
         "statusKey": "in_progress",
@@ -68,7 +68,7 @@
       },
       {
         "id": "R-03",
-        "issue": "Shot #12 failed generation 3 times in a row",
+        "issue": "Shot #12 failed generation 3 times and needs a local retry",
         "severity": "P0",
         "owner": "AI / Backend",
         "statusKey": "blocked",
@@ -76,38 +76,36 @@
       },
       {
         "id": "R-04",
-        "issue": "Per-episode cost may exceed budget by 10%",
+        "issue": "Per-shot cost must be validated with real production calls after launch",
         "severity": "P1",
         "owner": "PM",
         "statusKey": "in_progress",
-        "status": "Optimizing"
+        "status": "To Validate"
       }
     ]
   },
   "funnel": {
-    "title": "Shot Production Funnel (Episode 1)",
+    "title": "Shot Production Funnel (Episode 1 · Seeded State)",
     "colItem": "Stage",
     "colCount": "Count",
     "items": [
       { "label": "Total shots", "count": 24 },
       { "label": "Storyboards completed", "count": 24 },
-      { "label": "Images generated", "count": 24 },
-      { "label": "Images approved", "count": 21 },
-      { "label": "Videos generated", "count": 18 },
-      { "label": "Videos approved", "count": 16 },
-      { "label": "In progress", "count": 2 },
-      { "label": "Failed / retrying", "count": 2 }
+      { "label": "Shots with image results", "count": 20 },
+      { "label": "Image generation in progress", "count": 2 },
+      { "label": "Image generation failed / retry", "count": 2 },
+      { "label": "Videos generated", "count": 0 }
     ]
   },
   "kpi": {
-    "title": "Production KPIs",
+    "title": "Demo KPIs / Production Metrics to Validate",
     "items": [
       { "label": "Storyboard Completion", "value": "100%" },
-      { "label": "Image Success Rate", "value": "95.8%" },
-      { "label": "Video Success Rate", "value": "83.3%" },
-      { "label": "First-pass Review Rate", "value": "76.2%" },
-      { "label": "Avg. Shot Generation Time", "value": "72s" },
-      { "label": "Avg. Cost per Shot", "value": "¥1.84" }
+      { "label": "Current Image Completion", "value": "83.3%" },
+      { "label": "Processing Share", "value": "8.3%" },
+      { "label": "Failed / Retry Share", "value": "8.3%" },
+      { "label": "Character Consistency Pass Rate", "value": "Measure after launch" },
+      { "label": "Cost per Usable Shot", "value": "Measure after launch" }
     ]
   }
 }
