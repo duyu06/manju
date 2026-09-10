@@ -134,7 +134,9 @@ Demo 用来展示一条完整 AI 短剧生产链：
 7. 配置不同模型 Provider；
 8. 展示 AI Generate → Human Review → Regenerate 的质量闭环。
 
-> Demo Dashboard 中的项目进度、成功率和预算等数据均用于产品演示；Mock 数据会明确标识，不作为真实商业运营指标。
+当前固定 Seed 口径：**24 个分镜 / 20 个已有图片结果 / 2 个 processing / 2 个 failed / 视频生成 0**。第 12 镜保留三次失败语义用于演示局部 Retry。Dashboard 与 Seed 使用同一口径。
+
+> Demo Dashboard 中的项目进度、成功率和预算等数据均用于产品演示；Mock 数据会明确标识，不作为真实商业运营指标。仓库中的 SVG 媒体为离线演示占位资产，不冒充真实模型生成结果。
 
 ---
 
@@ -228,6 +230,45 @@ docker compose up -d
 
 AI 生成功能需要配置对应 Provider API Key；不配置 API Key 时仍可使用仓库中的 Demo 数据展示主要产品流程。
 
+### Windows 面试 Demo 一键准备
+
+在 PowerShell 中执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-interview-demo.ps1
+```
+
+脚本会：
+
+```text
+检查 Docker / Node / npm
+→ 创建 .env（不存在时）
+→ 启动 MySQL / Redis / MinIO
+→ Prisma generate / db push
+→ 写入《24小时之后》Seed
+→ 执行 Interview Demo Preflight
+```
+
+准备完成后运行：
+
+```bash
+npm run dev
+```
+
+也可以直接准备并启动：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-interview-demo.ps1 -StartApp
+```
+
+Demo 登录：`demo / demo123456`
+
+只做静态验收：
+
+```bash
+node scripts/interview-demo-preflight.mjs
+```
+
 ---
 
 ## 9. 面试资料
@@ -235,6 +276,7 @@ AI 生成功能需要配置对应 Provider API Key；不配置 API Key 时仍可
 - [`product/PRODUCT_CASE.md`](product/PRODUCT_CASE.md) — 产品案例 / PRD Lite
 - [`product/INTERVIEW_DEMO.md`](product/INTERVIEW_DEMO.md) — 5–7 分钟现场演示脚本
 - [`product/COMPETITOR_ANALYSIS.md`](product/COMPETITOR_ANALYSIS.md) — 洛神 AI 定向竞品分析
+- [`product/INTERVIEW_CHECKLIST.md`](product/INTERVIEW_CHECKLIST.md) — 面试前启动、数据口径、验收与故障预案
 
 ---
 
