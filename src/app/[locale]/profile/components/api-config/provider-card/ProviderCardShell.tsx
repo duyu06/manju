@@ -20,25 +20,12 @@ interface ProviderCardShellProps {
   children: ReactNode
 }
 
-export function getCompatibilityLayerBadgeLabel(
-  providerId: string,
-  t: ProviderCardTranslator,
-): string | null {
-  const providerKey = getProviderKey(providerId)
-  if (providerKey === 'openai-compatible') return t('compatibilityLayerOpenAI')
-  if (providerKey === 'gemini-compatible') return t('compatibilityLayerGemini')
-  return null
-}
-
-// 连接状态图标
 function StatusIcon({ connected }: { connected: boolean }) {
   if (connected) {
     return <AppIcon name="bolt" className="h-3.5 w-3.5 text-green-500" />
   }
   return <AppIcon name="unplug" className="h-3.5 w-3.5 text-red-400" />
 }
-
-// 使用统一的 VERIFIABLE_PROVIDER_KEYS（从 types 导入）
 
 export function ProviderCardShell({
   provider,
@@ -51,7 +38,6 @@ export function ProviderCardShell({
   state,
   children,
 }: ProviderCardShellProps) {
-  const compatibilityLayerLabel = getCompatibilityLayerBadgeLabel(provider.id, t)
   const providerKey = getProviderKey(provider.id)
   const isVerifiable = VERIFIABLE_PROVIDER_KEYS.has(providerKey)
   const canTest = isVerifiable && !!provider.hasApiKey
@@ -62,8 +48,6 @@ export function ProviderCardShell({
 
   return (
     <div className="glass-surface overflow-hidden rounded-2xl">
-
-      {/* ── 头部：logo + 名称 + 心电图 + 右侧操作 ── */}
       <div className="flex items-center justify-between px-3.5 py-2.5">
         <div className="flex items-center gap-2">
           {dragHandle}
@@ -74,13 +58,9 @@ export function ProviderCardShell({
               aria-label={hiddenToggleLabel}
               onClick={() => {
                 if (isHidden) {
-                  // Restoring — no confirmation needed
                   onToggleProviderHidden(provider.id, false)
-                } else {
-                  // Hiding — confirm first
-                  if (window.confirm(t('hideProviderConfirm'))) {
-                    onToggleProviderHidden(provider.id, true)
-                  }
+                } else if (window.confirm(t('hideProviderConfirm'))) {
+                  onToggleProviderHidden(provider.id, true)
                 }
               }}
               className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--glass-text-tertiary)] transition-colors hover:text-[var(--glass-text-secondary)]"
@@ -89,18 +69,11 @@ export function ProviderCardShell({
             </button>
           )}
           <h3 className="text-[15px] font-bold text-[var(--glass-text-primary)]">{provider.name}</h3>
-          {compatibilityLayerLabel && (
-            <span className="rounded-full border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--glass-text-secondary)]">
-              {compatibilityLayerLabel}
-            </span>
-          )}
-          {/* 连接状态图标 */}
           <span title={provider.hasApiKey ? t('connected') : t('notConfigured')}>
             <StatusIcon connected={!!provider.hasApiKey} />
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {/* 测试连接按钮（内联在标题行） */}
           {isVerifiable && !state.isEditing && state.keyTestStatus === 'idle' && (
             <button
               onClick={state.handleTestOnly}
@@ -137,7 +110,6 @@ export function ProviderCardShell({
         </div>
       </div>
 
-      {/* ── 教程弹窗 ── */}
       {state.showTutorial && state.tutorial && typeof document !== 'undefined'
         ? createPortal(
           <div
