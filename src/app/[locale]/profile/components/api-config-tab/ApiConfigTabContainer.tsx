@@ -60,7 +60,6 @@ export function ApiConfigTabContainer() {
     flushConfig,
     updateProviderHidden,
     updateProviderApiKey,
-    updateProviderBaseUrl,
     reorderProviders,
     deleteProvider,
     toggleModel,
@@ -125,7 +124,6 @@ export function ApiConfigTabContainer() {
         getModelsForProvider={getModelsForProvider}
         onToggleModel={toggleModel}
         onUpdateApiKey={updateProviderApiKey}
-        onUpdateBaseUrl={updateProviderBaseUrl}
         onReorderProviders={reorderProviders}
         onDeleteModel={deleteModel}
         onUpdateModel={updateModel}
