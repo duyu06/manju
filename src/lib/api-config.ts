@@ -5,7 +5,7 @@
  * 1) 模型唯一键必须是 provider::modelId
  * 2) 禁止 provider 猜测、静态降级和中转/聚合 provider
  * 3) 运行时只允许模型厂商第一方官方 API
- * 4) OpenAI-compatible 协议不等于 OpenAI 官方 API，统一拒绝
+ * 4) 模型 API 地址不属于用户配置；历史 baseUrl 字段不会进入运行时
  */
 
 import { prisma } from './prisma'
@@ -15,10 +15,6 @@ import {
   parseModelKeyStrict,
   type UnifiedModelType,
 } from './model-config-contract'
-import type {
-  OpenAICompatMediaTemplate,
-  OpenAICompatMediaTemplateSource,
-} from './openai-compat-media-template'
 
 export interface CustomModel {
   modelId: string
@@ -28,11 +24,6 @@ export interface CustomModel {
   provider: string
   llmProtocol?: 'responses' | 'chat-completions'
   llmProtocolCheckedAt?: string
-  // Legacy fields are kept in the type only so historical JSON can be read safely.
-  // Official-only runtime never routes through these templates.
-  compatMediaTemplate?: OpenAICompatMediaTemplate
-  compatMediaTemplateCheckedAt?: string
-  compatMediaTemplateSource?: OpenAICompatMediaTemplateSource
   price: number
 }
 
@@ -46,29 +37,23 @@ export interface ModelSelection {
   llmProtocol?: 'responses' | 'chat-completions'
 }
 
-type GatewayRouteType = 'official'
-
 interface CustomProvider {
   id: string
   name: string
-  baseUrl?: string
   apiKey?: string
   apiMode?: 'gemini-sdk' | 'openai-official'
-  gatewayRoute?: GatewayRouteType
+  gatewayRoute?: 'official'
 }
 
 type LlmProtocolType = 'responses' | 'chat-completions'
 
 /**
- * Provider IDs are configuration contracts, not protocol aliases.
- * Only first-party vendors already backed by direct implementations are allowed.
+ * Stored provider IDs must identify a model vendor, never a protocol proxy.
+ * Internal generator aliases such as "imagen" are not user provider IDs.
  */
 const OFFICIAL_PROVIDER_KEYS = new Set([
   'openai',
   'google',
-  'google-batch',
-  'imagen',
-  'anthropic',
   'bailian',
   'ark',
   'minimax',
@@ -80,6 +65,9 @@ const BLOCKED_PROVIDER_KEYS = new Set([
   'fal',
   'siliconflow',
   'openrouter',
+  'litellm',
+  'oneapi',
+  'newapi',
   'openai-compatible',
   'gemini-compatible',
 ])
@@ -114,9 +102,7 @@ function assertModelKey(value: string, field: string): { provider: string; model
   return parsed
 }
 
-/**
- * 提取提供商主键（用于多实例场景，如 google:uuid）
- */
+/** 提取提供商主键（支持官方 provider 的多实例 ID，如 google:uuid）。 */
 export function getProviderKey(providerId?: string): string {
   if (!providerId) return ''
   const colonIndex = providerId.indexOf(':')
@@ -132,45 +118,6 @@ function assertOfficialProvider(providerId: string): string {
     throw new Error(`OFFICIAL_PROVIDER_REQUIRED: ${providerId} is not in the first-party provider allowlist`)
   }
   return providerKey
-}
-
-function assertOfficialBaseUrl(providerKey: string, rawBaseUrl?: string): string | undefined {
-  const baseUrl = readTrimmedString(rawBaseUrl)
-  if (!baseUrl) {
-    return providerKey === 'minimax' ? 'https://api.minimaxi.com/v1' : undefined
-  }
-
-  let parsed: URL
-  try {
-    parsed = new URL(baseUrl)
-  } catch {
-    throw new Error(`OFFICIAL_ENDPOINT_INVALID: invalid base URL for ${providerKey}`)
-  }
-  if (parsed.protocol !== 'https:') {
-    throw new Error(`OFFICIAL_ENDPOINT_INVALID: ${providerKey} endpoint must use HTTPS`)
-  }
-
-  const host = parsed.hostname.toLowerCase()
-  const allowed = (() => {
-    switch (providerKey) {
-      case 'openai': return host === 'api.openai.com'
-      case 'google':
-      case 'google-batch':
-      case 'imagen':
-        return host === 'generativelanguage.googleapis.com' || host === 'aiplatform.googleapis.com'
-      case 'anthropic': return host === 'api.anthropic.com'
-      case 'bailian': return host === 'dashscope.aliyuncs.com'
-      case 'ark': return host.startsWith('ark.') && host.endsWith('.volces.com')
-      case 'minimax': return host === 'api.minimaxi.com'
-      case 'vidu': return host === 'api.vidu.cn' || host === 'api.vidu.com'
-      default: return false
-    }
-  })()
-
-  if (!allowed) {
-    throw new Error(`OFFICIAL_ENDPOINT_REQUIRED: ${host} is not an approved ${providerKey} first-party endpoint`)
-  }
-  return baseUrl.replace(/\/+$/, '')
 }
 
 function parseCustomProviders(rawProviders: string | null | undefined): CustomProvider[] {
@@ -223,10 +170,11 @@ function parseCustomProviders(rawProviders: string | null | undefined): CustomPr
       throw new Error(`OFFICIAL_PROVIDER_REQUIRED: providers[${index}].gatewayRoute must be official`)
     }
 
+    // Deliberately ignore historical raw.baseUrl. Vendor endpoints are constants
+    // inside first-party provider implementations and cannot be selected from DB.
     providers.push({
       id,
       name,
-      baseUrl: assertOfficialBaseUrl(providerKey, readTrimmedString(raw.baseUrl) || undefined),
       apiKey: readTrimmedString(raw.apiKey) || undefined,
       apiMode,
       gatewayRoute: 'official',
@@ -277,7 +225,9 @@ function normalizeStoredModel(raw: unknown, index: number): CustomModel {
     type: raw.type,
     name: readTrimmedString(raw.name) || modelId,
     ...(llmProtocol ? { llmProtocol } : {}),
-    ...(readTrimmedString(raw.llmProtocolCheckedAt) ? { llmProtocolCheckedAt: readTrimmedString(raw.llmProtocolCheckedAt) } : {}),
+    ...(readTrimmedString(raw.llmProtocolCheckedAt)
+      ? { llmProtocolCheckedAt: readTrimmedString(raw.llmProtocolCheckedAt) }
+      : {}),
     price: 0,
   }
 }
@@ -379,13 +329,12 @@ export interface ProviderConfig {
   id: string
   name: string
   apiKey: string
-  baseUrl?: string
   apiMode?: 'gemini-sdk' | 'openai-official'
-  gatewayRoute?: GatewayRouteType
+  gatewayRoute?: 'official'
 }
 
 export async function getProviderConfig(userId: string, providerId: string): Promise<ProviderConfig> {
-  const providerKey = assertOfficialProvider(providerId)
+  assertOfficialProvider(providerId)
   const { providers } = await readUserConfig(userId)
   const provider = pickProviderStrict(providers, providerId)
   if (!provider.apiKey) {
@@ -396,7 +345,6 @@ export async function getProviderConfig(userId: string, providerId: string): Pro
     id: provider.id,
     name: provider.name,
     apiKey: decryptApiKey(provider.apiKey),
-    baseUrl: assertOfficialBaseUrl(providerKey, provider.baseUrl),
     apiMode: provider.apiMode,
     gatewayRoute: 'official',
   }
