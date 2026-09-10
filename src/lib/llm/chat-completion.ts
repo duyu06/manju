@@ -6,7 +6,7 @@ import { getProviderConfig, getProviderKey } from '../api-config'
 import { getInternalLLMStreamCallbacks } from '../llm-observe/internal-stream-context'
 import type { ChatCompletionOptions } from './types'
 import { extractGoogleParts, extractGoogleUsage, GoogleEmptyResponseError } from './providers/google'
-import { buildOpenAIChatCompletion } from './providers/openai-compat'
+import { buildChatCompletionResult } from './completion-result'
 import { getCompletionParts } from './completion-parts'
 import {
   buildReasoningAwareContent,
@@ -137,7 +137,7 @@ export async function chatCompletion(
 
         const googleParts = extractGoogleParts(response, true)
         const usage = extractGoogleUsage(response)
-        const completion = buildOpenAIChatCompletion(
+        const completion = buildChatCompletionResult(
           resolvedModelId,
           buildReasoningAwareContent(googleParts.text, googleParts.reasoning),
           usage,
@@ -205,7 +205,7 @@ export async function chatCompletion(
           input: convertChatMessagesToArkInput(messages),
           thinking: arkThinkingParams.thinking,
         })
-        const completion = buildOpenAIChatCompletion(
+        const completion = buildChatCompletionResult(
           resolvedModelId,
           buildReasoningAwareContent(arkResult.text, arkResult.reasoning),
           arkResult.usage,
@@ -265,7 +265,7 @@ export async function chatCompletion(
       }
       const aiSdkResult = await generateText(generateParams)
       const usage = aiSdkResult.usage || aiSdkResult.totalUsage
-      const completion = buildOpenAIChatCompletion(
+      const completion = buildChatCompletionResult(
         resolvedModelId,
         buildReasoningAwareContent(aiSdkResult.text || '', aiSdkResult.reasoningText || ''),
         {
