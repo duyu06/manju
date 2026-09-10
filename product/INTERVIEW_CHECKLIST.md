@@ -4,6 +4,12 @@
 
 ## 1. 一键准备（Windows）
 
+如果是全新 clone，先安装依赖：
+
+```bash
+npm ci
+```
+
 PowerShell 在仓库根目录执行：
 
 ```powershell
@@ -29,10 +35,11 @@ Demo 账号：
 node scripts/interview-demo-preflight.mjs
 ```
 
-单独重置 / 重建 Demo 数据：
+单独重置 / 重建 Demo 数据时，需要连续执行 Seed 与失败案例规范化：
 
 ```bash
 npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
+npx tsx --env-file=.env scripts/normalize-interview-demo.ts
 ```
 
 ## 2. 固定 Demo 数据口径
@@ -43,7 +50,8 @@ npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
 - 20 个镜头已有本地图片结果（SVG 演示资产，可离线打开）；
 - 2 个镜头处于 processing；
 - 2 个镜头处于 failed；
-- 第 12 镜为重点失败案例，连续尝试 3 次，用于讲局部 Retry；
+- 第 12 镜为重点失败案例：`CHARACTER_CONSISTENCY_LOW`，连续尝试 3 次，用于讲一致性和局部 Retry；
+- 第 16 镜为 `PROVIDER_TIMEOUT`，用于讲第三方模型服务稳定性；
 - 当前 Seed 不伪造已完成视频，视频生成阶段显示为 0；
 - Dashboard 数据必须始终标注 Demo / Mock。
 
@@ -86,7 +94,7 @@ npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
 
 打开第 12 镜，展示 failed / attempt=3，并讲：
 
-> 生成式 AI 产品不能只设计 Happy Path。图片和视频都可能失败，因此 Retry 必须发生在最小生产单元。第 12 镜失败，只重跑第 12 镜，前 11 镜不重复消耗成本。
+> 生成式 AI 产品不能只设计 Happy Path。图片和视频都可能失败，因此 Retry 必须发生在最小生产单元。第 12 镜因为人物一致性未通过而失败，只重跑第 12 镜，前 11 镜不重复消耗成本。
 
 如果页面支持 Retry，现场点一次即可；若第三方 Provider 不稳定，只展示状态变化 / 已有任务，不等待完整生成。
 
@@ -123,7 +131,8 @@ npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
 - [ ] 20 个镜头有图片结果；
 - [ ] 2 个 processing 状态存在；
 - [ ] 2 个 failed 状态存在；
-- [ ] 第 12 镜能明确看到失败 / 三次尝试语义；
+- [ ] 第 12 镜能明确看到 `CHARACTER_CONSISTENCY_LOW` / 三次尝试语义；
+- [ ] 第 16 镜能表达 Provider Timeout；
 - [ ] 任一正常镜头可以查看并编辑 Prompt；
 - [ ] Dashboard 数据和 Seed 状态完全一致；
 - [ ] Provider 配置页面可以打开；
@@ -149,10 +158,11 @@ npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
 node scripts/interview-demo-preflight.mjs
 ```
 
-如果只是 DB 数据丢失，重新执行 Seed：
+如果只是 DB 数据丢失，重新执行：
 
 ```bash
 npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
+npx tsx --env-file=.env scripts/normalize-interview-demo.ts
 ```
 
 ### 面试官问“这些结果都是真实 AI 生成的吗？”
