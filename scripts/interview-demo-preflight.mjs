@@ -28,7 +28,10 @@ const requiredFiles = [
   'product/PRODUCT_CASE.md',
   'product/COMPETITOR_ANALYSIS.md',
   'product/INTERVIEW_DEMO.md',
+  'product/INTERVIEW_CHECKLIST.md',
   'scripts/seed-demo-project.ts',
+  'scripts/normalize-interview-demo.ts',
+  'scripts/prepare-interview-demo.ps1',
   'messages/zh/dashboard.json',
   'messages/en/dashboard.json',
 ]
@@ -59,6 +62,13 @@ if (existsSync(seedPath)) {
   check(seed.includes('imagePrompt:'), 'storyboard seed contains editable image prompts')
 }
 
+const normalizerPath = file('scripts/normalize-interview-demo.ts')
+if (existsSync(normalizerPath)) {
+  const normalizer = readFileSync(normalizerPath, 'utf8')
+  check(normalizer.includes('CHARACTER_CONSISTENCY_LOW'), 'shot #12 normalizes to character-consistency failure semantics')
+  check(normalizer.includes('PROVIDER_TIMEOUT'), 'shot #16 normalizes to provider-timeout failure semantics')
+}
+
 const zhDashboardPath = file('messages/zh/dashboard.json')
 if (existsSync(zhDashboardPath)) {
   try {
@@ -78,9 +88,10 @@ if (existsSync(zhDashboardPath)) {
 const envExample = file('.env.example')
 if (existsSync(envExample)) {
   const env = readFileSync(envExample, 'utf8')
-  check(env.includes('localhost:23306'), '.env.example MySQL port matches docker-compose host port 23306')
+  check(env.includes('DATABASE_URL="mysql://root:aidrama-studio123@localhost:23306/aidrama-studio"'), '.env.example MySQL port matches docker-compose host port 23306')
   check(env.includes('REDIS_PORT=26379'), '.env.example Redis port matches docker-compose host port 26379')
-  check(env.includes('localhost:29000'), '.env.example MinIO documentation matches docker-compose host port 29000')
+  check(env.includes('MINIO_ENDPOINT=http://localhost:29000'), '.env.example MinIO endpoint matches docker-compose host port 29000')
+  check(env.includes('STORAGE_TYPE=minio'), '.env.example defaults interview/local runs to self-hosted MinIO')
 }
 
 console.log('')
