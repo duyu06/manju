@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '@/components/ui/icons'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { getProviderKey, isPresetComingSoonModel, type CustomModel } from '../types'
+import { isPresetComingSoonModel, type CustomModel } from '../types'
 import type { UseProviderCardStateResult } from './hooks/useProviderCardState'
 import type {
   ProviderCardModelType,
@@ -29,66 +29,35 @@ const TypeIcon = ({
 }) => {
   switch (type) {
     case 'llm':
-      return (
-        <AppIcon name="menu" className={className} />
-      )
+      return <AppIcon name="menu" className={className} />
     case 'image':
-      return (
-        <AppIcon name="image" className={className} />
-      )
+      return <AppIcon name="image" className={className} />
     case 'video':
-      return (
-        <AppIcon name="video" className={className} />
-      )
+      return <AppIcon name="video" className={className} />
     case 'audio':
-      return (
-        <AppIcon name="audioWave" className={className} />
-      )
+      return <AppIcon name="audioWave" className={className} />
   }
 }
 
 const typeLabel = (type: ProviderCardModelType, t: ProviderCardTranslator) => {
   switch (type) {
-    case 'llm':
-      return t('typeText')
-    case 'image':
-      return t('typeImage')
-    case 'video':
-      return t('typeVideo')
-    case 'audio':
-      return t('typeAudio')
+    case 'llm': return t('typeText')
+    case 'image': return t('typeImage')
+    case 'video': return t('typeVideo')
+    case 'audio': return t('typeAudio')
   }
 }
 
 const MODEL_TYPES: readonly ProviderCardModelType[] = ['llm', 'image', 'video', 'audio']
 
-export function getAddableModelTypesForProvider(providerId: string): ProviderCardModelType[] {
-  const providerKey = getProviderKey(providerId)
-  if (providerKey === 'openai-compatible') return ['llm', 'image', 'video']
-  return ['llm', 'image', 'video', 'audio']
-}
-
-export function shouldShowOpenAICompatVideoHint(
-  providerId: string,
-  type: ProviderCardModelType | null,
-): boolean {
-  return getProviderKey(providerId) === 'openai-compatible' && type === 'video'
-}
-
-function shouldShowDefaultTabs(providerId: string): boolean {
-  const providerKey = getProviderKey(providerId)
-  return providerKey === 'openai-compatible' || providerKey === 'gemini-compatible'
+export function getAddableModelTypesForProvider(_providerId: string): ProviderCardModelType[] {
+  return [...MODEL_TYPES]
 }
 
 export function getVisibleModelTypesForProvider(
-  providerId: string,
+  _providerId: string,
   groupedModels: Partial<Record<ProviderCardModelType, CustomModel[]>>,
 ): ProviderCardModelType[] {
-  const shouldShowAllTabs = shouldShowDefaultTabs(providerId)
-  if (shouldShowAllTabs) {
-    return getAddableModelTypesForProvider(providerId)
-  }
-
   return MODEL_TYPES.filter((type) => {
     const modelsOfType = groupedModels[type]
     return Array.isArray(modelsOfType) && modelsOfType.length > 0
@@ -116,9 +85,7 @@ function getModelPriceTexts(model: CustomModel, t: ProviderCardTranslator): stri
   }
 
   const label = typeof model.priceLabel === 'string' ? model.priceLabel.trim() : ''
-  if (label) {
-    return label === '--' ? [] : [`¥${label}`]
-  }
+  if (label) return label === '--' ? [] : [`¥${label}`]
   if (typeof model.price === 'number' && Number.isFinite(model.price) && model.price > 0) {
     return [`¥${formatPriceAmount(model.price)}`]
   }
@@ -133,15 +100,12 @@ export function ProviderAdvancedFields({
   t,
   state,
 }: ProviderAdvancedFieldsProps) {
-  const providerKey = getProviderKey(provider.id)
   const addableModelTypes = new Set<ProviderCardModelType>(getAddableModelTypesForProvider(provider.id))
   const visibleTypes = useMemo(
     () => getVisibleModelTypesForProvider(provider.id, state.groupedModels),
     [provider.id, state.groupedModels],
   )
-  const [activeType, setActiveType] = useState<ProviderCardModelType | null>(
-    visibleTypes[0] ?? null,
-  )
+  const [activeType, setActiveType] = useState<ProviderCardModelType | null>(visibleTypes[0] ?? null)
   const activeTypeSignature = visibleTypes.join('|')
 
   useEffect(() => {
@@ -149,9 +113,7 @@ export function ProviderAdvancedFields({
       setActiveType(null)
       return
     }
-    if (!activeType || !visibleTypes.includes(activeType)) {
-      setActiveType(visibleTypes[0])
-    }
+    if (!activeType || !visibleTypes.includes(activeType)) setActiveType(visibleTypes[0])
   }, [activeType, activeTypeSignature, visibleTypes])
 
   const currentType = activeType ?? visibleTypes[0] ?? null
@@ -160,9 +122,8 @@ export function ProviderAdvancedFields({
     !!currentType
     && addableModelTypes.has(currentType)
     && state.showAddForm !== currentType
-  const defaultAddType: ProviderCardModelType = providerKey === 'openrouter' ? 'llm' : 'image'
-  const useTabbedLayout = state.hasModels || shouldShowDefaultTabs(provider.id)
-  const shouldShowVideoHint = shouldShowOpenAICompatVideoHint(provider.id, currentType)
+  const defaultAddType: ProviderCardModelType = 'image'
+  const useTabbedLayout = state.hasModels
 
   return useTabbedLayout ? (
     <div className="space-y-2.5 p-3">
@@ -202,9 +163,7 @@ export function ProviderAdvancedFields({
             <input
               type="text"
               value={state.newModel.name}
-              onChange={(event) =>
-                state.setNewModel({ ...state.newModel, name: event.target.value })
-              }
+              onChange={(event) => state.setNewModel({ ...state.newModel, name: event.target.value })}
               placeholder={t('modelDisplayName')}
               className="glass-input-base px-3 py-1.5 text-[12px]"
               autoFocus
@@ -217,9 +176,7 @@ export function ProviderAdvancedFields({
             <input
               type="text"
               value={state.newModel.modelId}
-              onChange={(event) =>
-                state.setNewModel({ ...state.newModel, modelId: event.target.value })
-              }
+              onChange={(event) => state.setNewModel({ ...state.newModel, modelId: event.target.value })}
               placeholder={t('modelActualId')}
               className={`glass-input-base flex-1 px-3 py-1.5 text-[12px] font-mono ${currentType === 'video' && state.batchMode && provider.id === 'ark' ? 'rounded-r-none' : ''}`}
             />
@@ -236,11 +193,6 @@ export function ProviderAdvancedFields({
               {state.isModelSavePending ? t('saving') : t('save')}
             </button>
           </div>
-          {shouldShowVideoHint && (
-            <p className="mt-2 text-xs text-[var(--glass-text-tertiary)]">
-              {t('openaiCompatVideoOnlyHint')}
-            </p>
-          )}
           {currentType === 'video' && provider.id === 'ark' && (
             <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-[var(--glass-bg-muted)] px-2 py-2">
               <button
@@ -248,9 +200,7 @@ export function ProviderAdvancedFields({
                 className="glass-check-mini"
                 data-active={state.batchMode}
               >
-                {state.batchMode && (
-                  <AppIcon name="checkSm" className="h-2.5 w-2.5 text-white" />
-                )}
+                {state.batchMode && <AppIcon name="checkSm" className="h-2.5 w-2.5 text-white" />}
               </button>
               <span className="text-xs font-medium text-[var(--glass-text-secondary)]">
                 {t('batchModeHalfPrice')}
@@ -303,9 +253,7 @@ export function ProviderAdvancedFields({
             <input
               type="text"
               value={state.newModel.name}
-              onChange={(event) =>
-                state.setNewModel({ ...state.newModel, name: event.target.value })
-              }
+              onChange={(event) => state.setNewModel({ ...state.newModel, name: event.target.value })}
               placeholder={t('modelDisplayName')}
               className="glass-input-base px-3 py-1.5 text-[12px]"
               autoFocus
@@ -318,9 +266,7 @@ export function ProviderAdvancedFields({
             <input
               type="text"
               value={state.newModel.modelId}
-              onChange={(event) =>
-                state.setNewModel({ ...state.newModel, modelId: event.target.value })
-              }
+              onChange={(event) => state.setNewModel({ ...state.newModel, modelId: event.target.value })}
               placeholder={t('modelActualId')}
               className="glass-input-base flex-1 px-3 py-1.5 text-[12px] font-mono"
             />
@@ -332,11 +278,6 @@ export function ProviderAdvancedFields({
               {state.isModelSavePending ? t('saving') : t('save')}
             </button>
           </div>
-          {shouldShowOpenAICompatVideoHint(provider.id, state.showAddForm) && (
-            <p className="mt-2 text-xs text-[var(--glass-text-tertiary)]">
-              {t('openaiCompatVideoOnlyHint')}
-            </p>
-          )}
         </div>
       )}
     </div>
@@ -377,24 +318,18 @@ function ModelRow({
             <input
               type="text"
               value={state.editModel.name}
-              onChange={(event) =>
-                state.setEditModel({ ...state.editModel, name: event.target.value })
-              }
+              onChange={(event) => state.setEditModel({ ...state.editModel, name: event.target.value })}
               className="glass-input-base w-full px-3 py-1.5 text-[12px]"
               placeholder={t('modelDisplayName')}
             />
             <input
               type="text"
               value={state.editModel.modelId}
-              onChange={(event) =>
-                state.setEditModel({ ...state.editModel, modelId: event.target.value })
-              }
+              onChange={(event) => state.setEditModel({ ...state.editModel, modelId: event.target.value })}
               className="glass-input-base w-full px-3 py-1.5 text-[12px] font-mono"
               placeholder={t('modelActualId')}
             />
-            {hasPriceText && (
-              <div className="text-xs text-[var(--glass-text-tertiary)]">{priceText}</div>
-            )}
+            {hasPriceText && <div className="text-xs text-[var(--glass-text-tertiary)]">{priceText}</div>}
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -451,7 +386,6 @@ function ModelRow({
             >
               <AppIcon name="trash" className="h-3.5 w-3.5" />
             </button>
-
             <button
               onClick={() => {
                 if (toggleDisabled) return
