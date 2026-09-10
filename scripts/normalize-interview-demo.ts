@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma'
 
-function panelNumberFromPayload(payload: unknown): number | null {
+function readDemoPayload(payload: unknown): { demo: true; panelNumber: number } | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
-  const value = (payload as Record<string, unknown>).panelNumber
-  return typeof value === 'number' ? value : null
+  const record = payload as Record<string, unknown>
+  if (record.demo !== true || typeof record.panelNumber !== 'number') return null
+  return { demo: true, panelNumber: record.panelNumber }
 }
 
 async function main() {
@@ -17,7 +18,8 @@ async function main() {
     },
   })
 
-  const shot12 = failedTasks.find((task) => panelNumberFromPayload(task.payload) === 12)
+  const demoFailedTasks = failedTasks.filter((task) => readDemoPayload(task.payload) !== null)
+  const shot12 = demoFailedTasks.find((task) => readDemoPayload(task.payload)?.panelNumber === 12)
   if (!shot12) {
     throw new Error('Interview demo task for shot #12 was not found. Run seed-demo-project.ts --apply first.')
   }
@@ -32,7 +34,7 @@ async function main() {
     },
   })
 
-  const shot16 = failedTasks.find((task) => panelNumberFromPayload(task.payload) === 16)
+  const shot16 = demoFailedTasks.find((task) => readDemoPayload(task.payload)?.panelNumber === 16)
   if (shot16) {
     await prisma.task.update({
       where: { id: shot16.id },
