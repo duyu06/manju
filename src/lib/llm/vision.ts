@@ -1,4 +1,3 @@
-
 import OpenAI from 'openai'
 import { GoogleGenAI } from '@google/genai'
 import { getProviderConfig, getProviderKey } from '../api-config'
@@ -6,7 +5,7 @@ import { getInternalLLMStreamCallbacks } from '../llm-observe/internal-stream-co
 import type { ChatCompletionOptions, ChatCompletionStreamCallbacks } from './types'
 import { arkResponsesCompletion } from './providers/ark'
 import { extractGoogleText, extractGoogleUsage } from './providers/google'
-import { buildOpenAIChatCompletion } from './providers/openai-compat'
+import { buildChatCompletionResult } from './completion-result'
 import { emitChunkedText } from './stream-helpers'
 import { getCompletionParts } from './completion-parts'
 import { isRetryableError, recordCompletionUsage, resolveLlmRuntimeModel } from './runtime-shared'
@@ -57,7 +56,7 @@ export async function chatCompletionWithVision(
         }
         if (textPrompt) parts.push({ text: textPrompt })
         const response = await ai.models.generateContent({ model: selection.modelId, contents: [{ role: 'user', parts }], config: { temperature } })
-        const completion = buildOpenAIChatCompletion(selection.modelId, extractGoogleText(response), extractGoogleUsage(response))
+        const completion = buildChatCompletionResult(selection.modelId, extractGoogleText(response), extractGoogleUsage(response))
         recordCompletionUsage(selection.modelId, completion)
         return completion
       }
@@ -72,7 +71,7 @@ export async function chatCompletionWithVision(
           input: [{ role: 'user', content }],
           thinking: { type: (options.reasoning ?? true) ? 'enabled' : 'disabled' },
         })
-        const completion = buildOpenAIChatCompletion(selection.modelId, result.text, result.usage)
+        const completion = buildChatCompletionResult(selection.modelId, result.text, result.usage)
         recordCompletionUsage(selection.modelId, completion)
         return completion
       }
