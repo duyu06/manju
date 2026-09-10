@@ -6,7 +6,7 @@
     "name": "AI 短剧《24小时之后》",
     "synopsis": "一个失业程序员偶然获得一个能够预测未来 24 小时的 AI 助手，但每使用一次预测能力，就会随机失去一段过去的记忆。",
     "statusLabel": "项目状态",
-    "status": "视频生成中",
+    "status": "图片生成 / 审核中",
     "etaLabel": "预计交付",
     "eta": "09/12",
     "sprintLabel": "迭代周期",
@@ -16,11 +16,11 @@
     "title": "项目概况",
     "progress": "总体进度",
     "stage": "项目阶段",
-    "stageValue": "视频生成",
+    "stageValue": "图片生成与审核",
     "blockers": "Blocker",
     "risks": "风险项",
-    "successRate": "AI 生成成功率",
-    "budgetUsage": "AI 成本预算消耗"
+    "successRate": "当前图片完成率",
+    "budgetUsage": "AI 成本预算消耗（Mock）"
   },
   "pipeline": {
     "title": "生产 Pipeline",
@@ -52,7 +52,7 @@
     "items": [
       {
         "id": "R-01",
-        "issue": "主角部分镜头人物一致性不足",
+        "issue": "主角部分镜头人物一致性需要人工复核",
         "severity": "P1",
         "owner": "AI 生成",
         "statusKey": "in_progress",
@@ -60,7 +60,7 @@
       },
       {
         "id": "R-02",
-        "issue": "视频 Provider 高峰期生成延迟",
+        "issue": "Provider 高峰期生成延迟",
         "severity": "P1",
         "owner": "后端",
         "statusKey": "in_progress",
@@ -68,7 +68,7 @@
       },
       {
         "id": "R-03",
-        "issue": "第 12 镜连续生成失败 3 次",
+        "issue": "第 12 镜连续生成失败 3 次，需要局部重试",
         "severity": "P0",
         "owner": "AI / 后端",
         "statusKey": "blocked",
@@ -76,38 +76,36 @@
       },
       {
         "id": "R-04",
-        "issue": "单集成本可能超过预算 10%",
+        "issue": "上线后需要用真实调用数据验证单镜成本",
         "severity": "P1",
         "owner": "PM",
         "statusKey": "in_progress",
-        "status": "优化中"
+        "status": "待验证"
       }
     ]
   },
   "funnel": {
-    "title": "镜头生产漏斗（第 1 集）",
+    "title": "镜头生产漏斗（第 1 集 · Seed 实际状态）",
     "colItem": "环节",
     "colCount": "数量",
     "items": [
       { "label": "总镜头数", "count": 24 },
       { "label": "已完成分镜", "count": 24 },
-      { "label": "已生成图片", "count": 24 },
-      { "label": "图片审核通过", "count": 21 },
-      { "label": "视频生成完成", "count": 18 },
-      { "label": "视频审核通过", "count": 16 },
-      { "label": "处理中", "count": 2 },
-      { "label": "失败待重试", "count": 2 }
+      { "label": "已有图片结果", "count": 20 },
+      { "label": "图片生成处理中", "count": 2 },
+      { "label": "图片生成失败待重试", "count": 2 },
+      { "label": "视频生成", "count": 0 }
     ]
   },
   "kpi": {
-    "title": "生产 KPI",
+    "title": "Demo KPI / 真实上线后的核心观测指标",
     "items": [
       { "label": "分镜完成率", "value": "100%" },
-      { "label": "图片生成成功率", "value": "95.8%" },
-      { "label": "视频生成成功率", "value": "83.3%" },
-      { "label": "一次审核通过率", "value": "76.2%" },
-      { "label": "平均镜头生成耗时", "value": "72s" },
-      { "label": "单镜平均成本", "value": "¥1.84" }
+      { "label": "当前图片完成率", "value": "83.3%" },
+      { "label": "处理中占比", "value": "8.3%" },
+      { "label": "失败待重试占比", "value": "8.3%" },
+      { "label": "角色一致性通过率", "value": "上线后采集" },
+      { "label": "单有效镜头成本", "value": "上线后采集" }
     ]
   }
 }
