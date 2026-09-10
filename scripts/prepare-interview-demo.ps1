@@ -26,6 +26,21 @@ if (-not (Test-Path '.env')) {
   Copy-Item '.env.example' '.env'
 } else {
   Write-Host 'Using existing .env'
+
+  # Only migrate the exact legacy localhost ports used by older demo builds.
+  # Custom/remote connection strings are intentionally left untouched.
+  $envText = Get-Content '.env' -Raw
+  $patched = $envText
+  $patched = $patched.Replace('localhost:13306', 'localhost:23306')
+  $patched = $patched.Replace('REDIS_PORT=16379', 'REDIS_PORT=26379')
+  $patched = $patched.Replace('localhost:19000', 'localhost:29000')
+
+  if ($patched -ne $envText) {
+    $backup = ".env.interview-backup-$((Get-Date).ToString('yyyyMMdd-HHmmss'))"
+    Copy-Item '.env' $backup
+    Set-Content '.env' $patched -NoNewline
+    Write-Host "Migrated legacy local demo ports; backup saved to $backup" -ForegroundColor Yellow
+  }
 }
 
 Step 'Starting MySQL, Redis and MinIO'
@@ -68,10 +83,20 @@ Write-Host 'Demo login: demo / demo123456'
 Write-Host 'Live path: Dashboard -> Assets -> Storyboard -> Shot #12 -> Retry -> Provider config'
 
 if ($StartApp) {
-  Step 'Starting local development app'
+  # Force the interview run to use local MinIO rather than a public file service.
+  # Process environment variables take precedence for the child npm process.
+  $env:STORAGE_TYPE = 'minio'
+  $env:MINIO_ENDPOINT = 'http://localhost:29000'
+  $env:MINIO_REGION = 'auto'
+  $env:MINIO_BUCKET = 'aidrama-studio'
+  $env:MINIO_ACCESS_KEY = 'minioadmin'
+  $env:MINIO_SECRET_KEY = 'minioadmin'
+  $env:MINIO_FORCE_PATH_STYLE = 'true'
+
+  Step 'Starting local development app with local MinIO storage'
   npm run dev
 } else {
   Write-Host "`nStart the UI when needed with:"
   Write-Host '  npm run dev'
-  Write-Host 'Or run this script with -StartApp to launch it immediately.'
+  Write-Host 'Or run this script with -StartApp to launch it immediately using local MinIO.'
 }
