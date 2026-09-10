@@ -28,7 +28,11 @@ import {
 } from './runtime-shared'
 import { completeBailianLlm } from '@/lib/providers/bailian'
 
-const SUPPORTED_OFFICIAL_LLM_PROVIDER_KEYS = new Set(['openai', 'google', 'bailian', 'ark'])
+const SUPPORTED_OFFICIAL_LLM_PROVIDER_KEYS = new Set(['openai', 'google', 'bailian', 'ark', 'minimax'])
+const OFFICIAL_OPENAI_PROTOCOL_ENDPOINTS: Readonly<Record<string, string>> = {
+  openai: 'https://api.openai.com/v1',
+  minimax: 'https://api.minimaxi.com/v1',
+}
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
@@ -103,10 +107,7 @@ export async function chatCompletion(
     const attemptStartedAt = Date.now()
     try {
       if (providerKey === 'google') {
-        const googleAiOptions = providerConfig.baseUrl
-          ? { apiKey: providerConfig.apiKey, httpOptions: { baseUrl: providerConfig.baseUrl } }
-          : { apiKey: providerConfig.apiKey }
-        const ai = new GoogleGenAI(googleAiOptions)
+        const ai = new GoogleGenAI({ apiKey: providerConfig.apiKey })
         const systemParts = messages
           .filter((m) => m.role === 'system')
           .map((m) => m.content)
@@ -169,7 +170,6 @@ export async function chatCompletion(
           modelId: resolvedModelId,
           messages,
           apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
           temperature,
         })
         const completionParts = getCompletionParts(completion)
@@ -233,15 +233,16 @@ export async function chatCompletion(
         return completion
       }
 
-      // Explicit OpenAI branch. The endpoint is pinned to OpenAI's first-party API
-      // by api-config.ts; no arbitrary OpenAI-compatible base URL is accepted.
-      const openAIBaseUrl = providerConfig.baseUrl || 'https://api.openai.com/v1'
-      const aiOpenAI = createOpenAI({
-        baseURL: openAIBaseUrl,
+      const baseURL = OFFICIAL_OPENAI_PROTOCOL_ENDPOINTS[providerKey]
+      if (!baseURL) {
+        throw new Error(`UNSUPPORTED_OFFICIAL_PROVIDER: no first-party LLM endpoint for ${providerKey}`)
+      }
+      const aiProvider = createOpenAI({
+        baseURL,
         apiKey: providerConfig.apiKey,
-        name: 'openai',
+        name: providerKey,
       })
-      const isNativeOpenAIReasoning = shouldUseOpenAIReasoningProviderOptions({
+      const isNativeOpenAIReasoning = providerKey === 'openai' && shouldUseOpenAIReasoningProviderOptions({
         providerKey: 'openai',
         providerApiMode: 'openai-official',
         modelId: resolvedModelId,
@@ -255,10 +256,10 @@ export async function chatCompletion(
         }
         : undefined
       const generateParams: Parameters<typeof generateText>[0] = {
-        model: aiOpenAI.chat(resolvedModelId),
+        model: aiProvider.chat(resolvedModelId),
         system: getSystemPrompt(messages),
         messages: getConversationMessages(messages) as ModelMessage[],
-        ...(reasoning ? {} : { temperature }),
+        ...(reasoning && providerKey === 'openai' ? {} : { temperature }),
         maxRetries,
         ...(aiSdkProviderOptions ? { providerOptions: aiSdkProviderOptions } : {}),
       }
@@ -275,7 +276,7 @@ export async function chatCompletion(
       logLlmRawOutput({
         userId,
         projectId,
-        provider: 'openai',
+        provider: providerKey,
         modelId: resolvedModelId,
         modelKey: selection.modelKey,
         stream: false,
@@ -291,9 +292,9 @@ export async function chatCompletion(
       llmLogger.info({
         action: 'llm.call.success',
         message: 'llm call succeeded',
-        provider: 'openai',
+        provider: providerKey,
         durationMs: Date.now() - attemptStartedAt,
-        details: { model: resolvedModelId, attempt, maxRetries, engine: 'openai_official' },
+        details: { model: resolvedModelId, attempt, maxRetries, engine: `${providerKey}_official` },
       })
       return completion
     } catch (error: unknown) {
