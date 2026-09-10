@@ -6,11 +6,12 @@ import {
 import { ensureBailianCatalogRegistered } from './catalog'
 import type { BailianLlmMessage } from './types'
 
+const BAILIAN_OFFICIAL_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+
 export interface BailianLlmCompletionParams {
   modelId: string
   messages: BailianLlmMessage[]
   apiKey: string
-  baseUrl?: string
   temperature?: number
 }
 
@@ -24,21 +25,18 @@ function assertRegistered(modelId: string): void {
 }
 
 export async function completeBailianLlm(
-  _params: BailianLlmCompletionParams,
+  params: BailianLlmCompletionParams,
 ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
-  assertRegistered(_params.modelId)
-  const baseURL = typeof _params.baseUrl === 'string' && _params.baseUrl.trim()
-    ? _params.baseUrl.trim()
-    : 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+  assertRegistered(params.modelId)
   const client = new OpenAI({
-    apiKey: _params.apiKey,
-    baseURL,
+    apiKey: params.apiKey,
+    baseURL: BAILIAN_OFFICIAL_BASE_URL,
     timeout: 30_000,
   })
   const completion = await client.chat.completions.create({
-    model: _params.modelId,
-    messages: _params.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-    temperature: _params.temperature ?? 0.7,
+    model: params.modelId,
+    messages: params.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+    temperature: params.temperature ?? 0.7,
   })
   return completion as OpenAI.Chat.Completions.ChatCompletion
 }
