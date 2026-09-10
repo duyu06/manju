@@ -74,6 +74,10 @@ Step 'Seeding the interview project: 24 Hours Later'
 npx tsx --env-file=.env scripts/seed-demo-project.ts --apply --create-user
 if ($LASTEXITCODE -ne 0) { throw 'demo seed failed' }
 
+Step 'Normalizing interview failure cases'
+npx tsx --env-file=.env scripts/normalize-interview-demo.ts
+if ($LASTEXITCODE -ne 0) { throw 'demo failure normalization failed' }
+
 Step 'Running interview demo preflight'
 node scripts/interview-demo-preflight.mjs
 if ($LASTEXITCODE -ne 0) { throw 'interview demo preflight failed' }
