@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const openAIState = vi.hoisted(() => ({
+  constructorArgs: [] as Array<Record<string, unknown>>,
   modelList: vi.fn(async () => ({ data: [] })),
   create: vi.fn(async () => ({
     model: 'gpt-4.1-mini',
@@ -11,14 +12,11 @@ const openAIState = vi.hoisted(() => ({
 const fetchMock = vi.hoisted(() =>
   vi.fn(async (input: unknown) => {
     const url = String(input)
-    if (url.includes('/compatible-mode/v1/models')) {
+    if (url.includes('generativelanguage.googleapis.com/v1beta/models')) {
+      return new Response(JSON.stringify({ models: [{ name: 'models/gemini-3-flash-preview' }] }), { status: 200 })
+    }
+    if (url.includes('dashscope.aliyuncs.com/compatible-mode/v1/models')) {
       return new Response(JSON.stringify({ data: [{ id: 'qwen-plus' }] }), { status: 200 })
-    }
-    if (url.endsWith('/v1/models')) {
-      return new Response(JSON.stringify({ data: [{ id: 'Qwen/Qwen3-32B' }] }), { status: 200 })
-    }
-    if (url.endsWith('/v1/user/info')) {
-      return new Response(JSON.stringify({ data: { balance: '9.8000' } }), { status: 200 })
     }
     return new Response('not-found', { status: 404 })
   }),
@@ -26,6 +24,9 @@ const fetchMock = vi.hoisted(() =>
 
 vi.mock('openai', () => ({
   default: class OpenAI {
+    constructor(args: Record<string, unknown>) {
+      openAIState.constructorArgs.push(args)
+    }
     models = {
       list: openAIState.modelList,
     }
@@ -39,59 +40,80 @@ vi.mock('openai', () => ({
 
 import { testLlmConnection } from '@/lib/user-api/llm-test-connection'
 
-describe('llm test connection', () => {
+describe('official-only llm test connection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    openAIState.constructorArgs.length = 0
     vi.stubGlobal('fetch', fetchMock)
   })
 
-  it('tests openai-compatible provider via openai-style endpoint', async () => {
+  it('tests OpenAI only through the pinned official endpoint', async () => {
     const result = await testLlmConnection({
-      provider: 'openai-compatible',
+      provider: 'openai',
       apiKey: 'oa-key',
-      baseUrl: 'https://compat.example.com/v1',
       model: 'gpt-4.1-mini',
     })
 
-    expect(result.provider).toBe('openai-compatible')
-    expect(result.message).toBe('openai-compatible 连接成功')
-    expect(result.model).toBe('gpt-4.1-mini')
+    expect(result.provider).toBe('openai')
+    expect(result.message).toBe('openai 官方 API 连接成功')
     expect(result.answer).toBe('2')
-    expect(openAIState.create).toHaveBeenCalledWith({
-      model: 'gpt-4.1-mini',
-      messages: [{ role: 'user', content: '1+1等于几？只回答数字' }],
-      max_tokens: 10,
-      temperature: 0,
+    expect(openAIState.constructorArgs[0]).toMatchObject({
+      apiKey: 'oa-key',
+      baseURL: 'https://api.openai.com/v1',
     })
   })
 
-  it('requires baseUrl for gemini-compatible provider', async () => {
-    await expect(testLlmConnection({
-      provider: 'gemini-compatible',
-      apiKey: 'gm-key',
-    })).rejects.toThrow('自定义渠道需要提供 baseUrl')
+  it('tests Google through Google official API', async () => {
+    const result = await testLlmConnection({
+      provider: 'google',
+      apiKey: 'google-key',
+    })
+
+    expect(result).toMatchObject({
+      provider: 'google',
+      message: 'google 官方 API 连接成功',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('https://generativelanguage.googleapis.com/v1beta/models'),
+      expect.any(Object),
+    )
   })
 
-  it('tests bailian provider via zero-inference probe', async () => {
+  it('tests Bailian through the official DashScope endpoint', async () => {
     const result = await testLlmConnection({
       provider: 'bailian',
       apiKey: 'bl-key',
     })
 
-    expect(result.provider).toBe('bailian')
-    expect(result.message).toBe('bailian 连接成功')
-    expect(result.model).toBe('qwen-plus')
+    expect(result).toMatchObject({
+      provider: 'bailian',
+      message: 'bailian 官方 API 连接成功',
+      model: 'qwen-plus',
+    })
   })
 
-  it('tests siliconflow provider via zero-inference probes', async () => {
-    const result = await testLlmConnection({
-      provider: 'siliconflow',
-      apiKey: 'sf-key',
-    })
+  it('pins Ark and MiniMax to first-party hosts', async () => {
+    await testLlmConnection({ provider: 'ark', apiKey: 'ark-key', model: 'doubao-seed-2-0-lite-260215' })
+    await testLlmConnection({ provider: 'minimax', apiKey: 'minimax-key', model: 'MiniMax-M2.5' })
 
-    expect(result.provider).toBe('siliconflow')
-    expect(result.message).toBe('siliconflow 连接成功')
-    expect(result.model).toBe('Qwen/Qwen3-32B')
-    expect(result.answer).toBe('balance=9.8000')
+    expect(openAIState.constructorArgs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ baseURL: 'https://ark.cn-beijing.volces.com/api/v3' }),
+      expect.objectContaining({ baseURL: 'https://api.minimaxi.com/v1' }),
+    ]))
+  })
+
+  it('rejects relay, aggregator, and arbitrary compatible providers', async () => {
+    for (const provider of [
+      'openrouter',
+      'siliconflow',
+      'evolink',
+      'fal',
+      'openai-compatible',
+      'gemini-compatible',
+      'custom',
+    ]) {
+      await expect(testLlmConnection({ provider, apiKey: 'blocked-key' }))
+        .rejects.toThrow(/OFFICIAL_PROVIDER_REQUIRED/)
+    }
   })
 })
