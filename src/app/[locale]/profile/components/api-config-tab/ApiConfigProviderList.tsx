@@ -40,7 +40,6 @@ interface ApiConfigProviderListProps {
   getModelsForProvider: (providerId: string) => CustomModel[]
   onToggleModel: (modelKey: string, providerId: string) => void
   onUpdateApiKey: (providerId: string, apiKey: string) => void
-  onUpdateBaseUrl: (providerId: string, baseUrl: string) => void
   onReorderProviders: (activeProviderId: string, overProviderId: string) => void
   onDeleteModel: (modelKey: string, providerId: string) => void
   onUpdateModel: (modelKey: string, updates: Partial<CustomModel>, providerId: string) => void
@@ -68,7 +67,6 @@ export function ApiConfigProviderList({
   getModelsForProvider,
   onToggleModel,
   onUpdateApiKey,
-  onUpdateBaseUrl,
   onReorderProviders,
   onDeleteModel,
   onUpdateModel,
@@ -147,7 +145,6 @@ export function ApiConfigProviderList({
                       defaultModels={defaultModels}
                       onToggleModel={(modelKey) => onToggleModel(modelKey, provider.id)}
                       onUpdateApiKey={onUpdateApiKey}
-                      onUpdateBaseUrl={onUpdateBaseUrl}
                       onDeleteModel={(modelKey) => onDeleteModel(modelKey, provider.id)}
                       onUpdateModel={(modelKey, updates) => onUpdateModel(modelKey, updates, provider.id)}
                       onDeleteProvider={onDeleteProvider}
@@ -196,7 +193,6 @@ export function ApiConfigProviderList({
                     defaultModels={defaultModels}
                     onToggleModel={(modelKey) => onToggleModel(modelKey, provider.id)}
                     onUpdateApiKey={onUpdateApiKey}
-                    onUpdateBaseUrl={onUpdateBaseUrl}
                     onDeleteModel={(modelKey) => onDeleteModel(modelKey, provider.id)}
                     onUpdateModel={(modelKey, updates) => onUpdateModel(modelKey, updates, provider.id)}
                     onDeleteProvider={onDeleteProvider}
